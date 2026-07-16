@@ -37,11 +37,12 @@ jobs:
 
       # ── Patch react-native gradle plugin ──────────────────────────────────
       # 1) Remove foojay-resolver-convention (not available in CI)
-      # 2) Remove serviceOf<ModuleRegistry>() from react-native-gradle-plugin/build.gradle.kts
-      #    This Gradle internal API was removed in Gradle 8.x. Its presence in a testRuntimeOnly()
-      #    call causes the react-native-gradle-plugin subproject to fail to compile entirely,
-      #    which means com.facebook.react.rootproject is never registered → "Plugin not found".
-      #    JS patcher is base64-encoded to avoid YAML/shell quoting and indentation issues.
+      # 2) Remove serviceOf<ModuleRegistry>() — Gradle internal API removed in 8.x.
+      #    The block is MULTILINE: testRuntimeOnly(\n    serviceOf<ModuleRegistry>()\n)
+      #    Also removes both import lines (serviceOf + ModuleRegistry).
+      #    Without this, react-native-gradle-plugin fails to compile and
+      #    com.facebook.react.rootproject is never registered → "Plugin not found".
+      #    JS patcher is base64-encoded to avoid YAML block-scalar indentation issues.
       - name: Patch react-native gradle plugin (CI compat)
         run: |
           # Patch 1 — settings.gradle.kts: remove foojay resolver
@@ -52,16 +53,15 @@ jobs:
           fi
 
           # Patch 2 — react-native-gradle-plugin/build.gradle.kts
-          # Decode the JS patcher from base64 → /tmp/patch_rn.js, then run it.
-          # Using base64 avoids all YAML block-scalar / heredoc / shell-quoting problems.
+          # Decode JS patcher from base64 → /tmp/patch_rn.js, then run with node.
           PLUGIN_BUILD="node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/build.gradle.kts"
           if [ -f "$PLUGIN_BUILD" ]; then
-            echo "--- serviceOf lines before patch ---"
+            echo "--- serviceOf/ModuleRegistry lines BEFORE patch ---"
             grep -n 'serviceOf\|ModuleRegistry' "$PLUGIN_BUILD" || echo "(none found)"
-            echo "Y29uc3QgZnMgPSByZXF1aXJlKCdmcycpOwpjb25zdCBmaWxlUGF0aCA9IHByb2Nlc3MuYXJndlsyXTsKbGV0IHNyYyA9IGZzLnJlYWRGaWxlU3luYyhmaWxlUGF0aCwgJ3V0ZjgnKTsKbGV0IG91dCA9IHNyYzsKLy8gUmVtb3ZlIHRlc3RSdW50aW1lT25seShzZXJ2aWNlT2Y8TW9kdWxlUmVnaXN0cnk+KCkpIOKAlCBpbnRlcm5hbCBHcmFkbGUgQVBJIHJlbW92ZWQgaW4gOC54Cm91dCA9IG91dC5yZXBsYWNlKC9bIFx0XSp0ZXN0UnVudGltZU9ubHlcKHNlcnZpY2VPZjxNb2R1bGVSZWdpc3RyeT5cKFwpXClbIFx0XSpccj9cbj8vZywgJycpOwovLyBSZW1vdmUgYW55IGltcG9ydCBsaW5lIHJlZmVyZW5jaW5nIHNlcnZpY2VPZgpvdXQgPSBvdXQucmVwbGFjZSgvWyBcdF0qaW1wb3J0W15cbl0qc2VydmljZU9mW15cbl0qXHI/XG4/L2csICcnKTsKY29uc3QgY2hhbmdlZCA9IHNyYyAhPT0gb3V0Owpmcy53cml0ZUZpbGVTeW5jKGZpbGVQYXRoLCBvdXQpOwpjb25zb2xlLmxvZygnUGF0Y2ggcmVzdWx0OicsIGNoYW5nZWQgPyAnQ0hBTkdFRCAtIHNlcnZpY2VPZjxNb2R1bGVSZWdpc3RyeT4oKSByZW1vdmVkJyA6ICdOTyBDSEFOR0UgLSBwYXR0ZXJuIG5vdCBmb3VuZCcpOwppZiAoIWNoYW5nZWQpIHsKICBzcmMuc3BsaXQoJ1xuJykuZm9yRWFjaCgobCwgaSkgPT4gewogICAgaWYgKC90ZXN0UnVudGltZXxzZXJ2aWNlT2Z8TW9kdWxlUmVnaXN0cnkvLnRlc3QobCkpIGNvbnNvbGUubG9nKCcgIEwnKyhpKzEpKyc6ICcrbCk7CiAgfSk7Cn0=" \
+            echo "Y29uc3QgZnMgPSByZXF1aXJlKCdmcycpOwpjb25zdCBmaWxlUGF0aCA9IHByb2Nlc3MuYXJndlsyXTsKbGV0IHNyYyA9IGZzLnJlYWRGaWxlU3luYyhmaWxlUGF0aCwgJ3V0ZjgnKTsKbGV0IG91dCA9IHNyYzsKCi8vIDEpIE11bHRpbGluZTogdGVzdFJ1bnRpbWVPbmx5KAogICAgc2VydmljZU9mPE1vZHVsZVJlZ2lzdHJ5PigpCikKb3V0ID0gb3V0LnJlcGxhY2UoL1sgXHRdKnRlc3RSdW50aW1lT25seVwoXHMqXG5bIFx0XSpzZXJ2aWNlT2Y8TW9kdWxlUmVnaXN0cnk+XChcKVxzKlxuWyBcdF0qXClbIFx0XSpccj9cbj8vZywgJycpOwoKLy8gMikgU2luZ2xlLWxpbmU6IHRlc3RSdW50aW1lT25seShzZXJ2aWNlT2Y8TW9kdWxlUmVnaXN0cnk+KCkpCm91dCA9IG91dC5yZXBsYWNlKC9bIFx0XSp0ZXN0UnVudGltZU9ubHlcKHNlcnZpY2VPZjxNb2R1bGVSZWdpc3RyeT5cKFwpXClbIFx0XSpccj9cbj8vZywgJycpOwoKLy8gMykgQW55IHJlbWFpbmluZyBzdGFuZGFsb25lIHNlcnZpY2VPZjxNb2R1bGVSZWdpc3RyeT4oKSBsaW5lCm91dCA9IG91dC5yZXBsYWNlKC9eWyBcdF0qc2VydmljZU9mPE1vZHVsZVJlZ2lzdHJ5PlwoXClbIFx0XSpccj9cbj8vbWcsICcnKTsKCi8vIDQpIFJlbW92ZSBpbXBvcnQgbGluZXMgZm9yIHNlcnZpY2VPZiBBTkQgTW9kdWxlUmVnaXN0cnkKb3V0ID0gb3V0LnJlcGxhY2UoL15bIFx0XSppbXBvcnRbXlxuXSpzZXJ2aWNlT2ZbXlxuXSpccj9cbj8vbWcsICcnKTsKb3V0ID0gb3V0LnJlcGxhY2UoL15bIFx0XSppbXBvcnRbXlxuXSpNb2R1bGVSZWdpc3RyeVteXG5dKlxyP1xuPy9tZywgJycpOwoKLy8gNSkgQ2xlYW4gdXAgZGFuZ2xpbmcgZW1wdHkgdGVzdFJ1bnRpbWVPbmx5KCkgbGVmdCBiZWhpbmQKb3V0ID0gb3V0LnJlcGxhY2UoL15bIFx0XSp0ZXN0UnVudGltZU9ubHlcKFxzKlwpWyBcdF0qXHI/XG4/L21nLCAnJyk7Cgpjb25zdCBjaGFuZ2VkID0gc3JjICE9PSBvdXQ7CmZzLndyaXRlRmlsZVN5bmMoZmlsZVBhdGgsIG91dCk7CmNvbnNvbGUubG9nKCdQYXRjaCByZXN1bHQ6JywgY2hhbmdlZCA/ICdDSEFOR0VEIC0gcGF0Y2hlZCBPSycgOiAnTk8gQ0hBTkdFIC0gcGF0dGVybiBub3QgbWF0Y2hlZCcpOwpjb25zb2xlLmxvZygnUmVtYWluaW5nIHNlcnZpY2VPZi9Nb2R1bGVSZWdpc3RyeSBsaW5lcyBhZnRlciBwYXRjaDonKTsKb3V0LnNwbGl0KCdcbicpLmZvckVhY2goKGwsIGkpID0+IHsKICBpZiAoL3NlcnZpY2VPZnxNb2R1bGVSZWdpc3RyeS8udGVzdChsKSkgY29uc29sZS5sb2coJyAgTCcrKGkrMSkrJzogJytsKTsKfSk7Cg==" \
               | base64 -d > /tmp/patch_rn.js
             node /tmp/patch_rn.js "$PLUGIN_BUILD"
-            echo "--- serviceOf lines after patch ---"
+            echo "--- serviceOf/ModuleRegistry lines AFTER patch ---"
             grep -n 'serviceOf\|ModuleRegistry' "$PLUGIN_BUILD" || echo "(none — patch OK)"
           else
             echo "WARNING: $PLUGIN_BUILD not found — listing gradle-plugin dir:"
