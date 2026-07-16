@@ -35,18 +35,39 @@ jobs:
       - name: Install npm dependencies
         run: npm install --legacy-peer-deps
 
-      # ── Patch RN gradle plugin: remove foojay toolchain resolver ─
-      # The foojay-resolver-convention plugin causes the included build to
-      # fail silently in CI, making com.facebook.react.* plugins unfindable.
-      - name: Patch react-native gradle plugin (remove foojay)
+      # ── Patch RN gradle plugin for Gradle 8.6 compatibility ──────
+      # 1. Remove foojay-resolver-convention (not needed in CI)
+      # 2. Remove testRuntimeOnly block using serviceOf<ModuleRegistry>()
+      #    which uses an internal API removed in Gradle 8.6
+      - name: Patch react-native gradle plugin (Gradle 8.6 compat)
         run: |
           SETTINGS="node_modules/@react-native/gradle-plugin/settings.gradle.kts"
+          BUILD_KTS="node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/build.gradle.kts"
+          
+          # 1. Remove foojay
           if [ -f "$SETTINGS" ]; then
             sed -i '/foojay-resolver-convention/d' "$SETTINGS"
-            echo "Patched: removed foojay line"
-            cat "$SETTINGS"
-          else
-            echo "Settings file not found at $SETTINGS"
+            echo "Patched settings: removed foojay line"
+          fi
+          
+          # 2. Remove the internal API imports and testRuntimeOnly block
+          if [ -f "$BUILD_KTS" ]; then
+            # Remove internal imports
+            sed -i '/org.gradle.api.internal.classpath.ModuleRegistry/d' "$BUILD_KTS"
+            sed -i '/org.gradle.configurationcache.extensions.serviceOf/d' "$BUILD_KTS"
+            # Remove testRuntimeOnly block with serviceOf (Python for multiline)
+            python3 -c "
+import re, sys
+with open('$BUILD_KTS') as f:
+    content = f.read()
+# Remove testRuntimeOnly block
+content = re.sub(r'\s*testRuntimeOnly\s*\(\s*files\s*\(.*?\.first\(\)\)\)', '', content, flags=re.DOTALL)
+with open('$BUILD_KTS', 'w') as f:
+    f.write(content)
+print('Patched: removed testRuntimeOnly serviceOf block')
+"
+            echo "=== Patched build.gradle.kts (relevant section) ==="
+            grep -n "serviceOf\|ModuleRegistry\|testRuntimeOnly" "$BUILD_KTS" || echo "Clean - no internal API references"
           fi
 
       # ── Gradle wrapper permissions ────────────────────────────
