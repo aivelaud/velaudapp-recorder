@@ -35,30 +35,15 @@ jobs:
       - name: Install npm dependencies
         run: npm install --legacy-peer-deps
 
-      # ── Patch RN gradle plugin for Gradle 8.6 compatibility ──────
-      # 1. Remove foojay-resolver-convention (not needed in CI)
-      # 2. Remove testRuntimeOnly block using serviceOf<ModuleRegistry>()
-      #    which uses an internal API removed in Gradle 8.6
-      - name: Patch react-native gradle plugin (Gradle 8.6 compat)
+      # ── Patch RN gradle plugin (foojay removal for CI) ─────────
+      # Gradle 8.4 compatible — no internal API patches needed.
+      # Remove foojay-resolver-convention which is not needed in CI.
+      - name: Patch react-native gradle plugin (CI compat)
         run: |
           SETTINGS="node_modules/@react-native/gradle-plugin/settings.gradle.kts"
-          BUILD_KTS="node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/build.gradle.kts"
-          
-          # 1. Remove foojay
           if [ -f "$SETTINGS" ]; then
-            sed -i '/foojay-resolver-convention/d' "$SETTINGS"
-            echo "Patched settings: removed foojay line"
-          fi
-          
-          # 2. Remove the internal API imports and testRuntimeOnly block
-          if [ -f "$BUILD_KTS" ]; then
-            # Remove internal imports
-            sed -i '/org.gradle.api.internal.classpath.ModuleRegistry/d' "$BUILD_KTS"
-            sed -i '/org.gradle.configurationcache.extensions.serviceOf/d' "$BUILD_KTS"
-            # Remove testRuntimeOnly block with serviceOf (perl one-liner — avoids YAML indent issues)
-            perl -0777 -i -pe 's/\s*testRuntimeOnly\s*\(\s*files\s*\(.*?\.first\(\)\s*\)\s*\)//gs' "$BUILD_KTS" && echo "Patched: removed testRuntimeOnly serviceOf block"
-            echo "=== Patched build.gradle.kts (relevant section) ==="
-            grep -n "serviceOf\|ModuleRegistry\|testRuntimeOnly" "$BUILD_KTS" || echo "Clean - no internal API references"
+            sed -i "/foojay-resolver-convention/d" "$SETTINGS"
+            echo "Patched: removed foojay-resolver-convention"
           fi
 
       # ── Gradle wrapper permissions ────────────────────────────
@@ -68,8 +53,8 @@ jobs:
       # ── Generate gradle-wrapper.jar via minimal isolated project ─
       - name: Generate gradle-wrapper.jar
         run: |
-          # Install Gradle via SDKMAN to generate the wrapper
-          GRADLE_VERSION="8.6"
+          # Download Gradle 8.4 binary to generate the wrapper (matches gradle-wrapper.properties)
+          GRADLE_VERSION="8.4"
           
           # Install Gradle using apt or direct binary
           mkdir -p /tmp/gradle-install
