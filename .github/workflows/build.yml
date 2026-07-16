@@ -89,28 +89,17 @@ jobs:
       # ── ADIM A: assembleRelease (Gradle ABI/density splits) ────
       - name: Build Release APKs (Gradle ABI splits — ADIM A)
         working-directory: android
-        run: |
-          ./gradlew assembleRelease \
-            --stacktrace \
-            --no-daemon \
-            -Porg.gradle.jvmargs="-Xmx4g"
+        run: ./gradlew assembleRelease --stacktrace --no-daemon
 
       # ── ADIM A: assembleDebug (universal debug APK) ───────────
       - name: Build Debug APK
         working-directory: android
-        run: |
-          ./gradlew assembleDebug \
-            --no-daemon \
-            -Porg.gradle.jvmargs="-Xmx4g"
+        run: ./gradlew assembleDebug --no-daemon
 
       # ── ADIM B Step 1: bundleRelease (.aab) ───────────────────
       - name: Build Release AAB (ADIM B — Step 1)
         working-directory: android
-        run: |
-          ./gradlew bundleRelease \
-            --stacktrace \
-            --no-daemon \
-            -Porg.gradle.jvmargs="-Xmx4g"
+        run: ./gradlew bundleRelease --stacktrace --no-daemon
 
       # ── ADIM B Step 2: Verify .aab exists ─────────────────────
       - name: Verify AAB exists
