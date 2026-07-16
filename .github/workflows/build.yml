@@ -55,17 +55,8 @@ jobs:
             # Remove internal imports
             sed -i '/org.gradle.api.internal.classpath.ModuleRegistry/d' "$BUILD_KTS"
             sed -i '/org.gradle.configurationcache.extensions.serviceOf/d' "$BUILD_KTS"
-            # Remove testRuntimeOnly block with serviceOf (Python for multiline)
-            python3 -c "
-import re, sys
-with open('$BUILD_KTS') as f:
-    content = f.read()
-# Remove testRuntimeOnly block
-content = re.sub(r'\s*testRuntimeOnly\s*\(\s*files\s*\(.*?\.first\(\)\)\)', '', content, flags=re.DOTALL)
-with open('$BUILD_KTS', 'w') as f:
-    f.write(content)
-print('Patched: removed testRuntimeOnly serviceOf block')
-"
+            # Remove testRuntimeOnly block with serviceOf (perl one-liner — avoids YAML indent issues)
+            perl -0777 -i -pe 's/\s*testRuntimeOnly\s*\(\s*files\s*\(.*?\.first\(\)\)\)//gs' "$BUILD_KTS" && echo "Patched: removed testRuntimeOnly serviceOf block"
             echo "=== Patched build.gradle.kts (relevant section) ==="
             grep -n "serviceOf\|ModuleRegistry\|testRuntimeOnly" "$BUILD_KTS" || echo "Clean - no internal API references"
           fi
