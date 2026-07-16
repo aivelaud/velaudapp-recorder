@@ -107,6 +107,34 @@ jobs:
             -keypass android \
             -dname "CN=Android Debug,O=Android,C=US"
 
+      # ── Debug: find RN gradle task names & generate PackageList ──
+      # continue-on-error so build proceeds even if tasks don't exist
+      - name: Debug + Generate PackageList
+        working-directory: android
+        continue-on-error: true
+        run: |
+          echo "=== Available tasks related to autolinking/package ==="
+          ./gradlew :app:tasks --all --no-daemon 2>&1 \
+            | grep -iE "package|autol|link|rncli|generat" | head -40 || true
+
+          echo ""
+          echo "=== Try to generate PackageList (all known task names) ==="
+          ./gradlew :app:generatePackageList --no-daemon 2>&1 | tail -5 || true
+          ./gradlew :app:generateReleasePackageList --no-daemon 2>&1 | tail -5 || true
+          ./gradlew :app:generateDebugPackageList --no-daemon 2>&1 | tail -5 || true
+
+          echo ""
+          echo "=== PackageList files found ==="
+          find . -name "PackageList*" -type f 2>/dev/null || echo "(none)"
+
+          echo ""
+          echo "=== generated/rncli directory contents ==="
+          find app/build/generated/rncli -type f 2>/dev/null | head -20 || echo "(rncli dir empty or not found)"
+
+          echo ""
+          echo "=== generated/autolinking directory contents ==="
+          find . -path "*/generated/autolinking*" -type f 2>/dev/null | head -20 || echo "(autolinking dir empty or not found)"
+
       # ── Build Release APKs ────────────────────────────────────
       - name: Build Release APKs
         working-directory: android
