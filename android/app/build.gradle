@@ -73,7 +73,8 @@ android {
         }
         language {
             enable true
-            includeSplits true
+            // includeSplits was removed in AGP 8.x; language splits are
+            // auto-detected from resource qualifiers when enable=true.
         }
     }
 
