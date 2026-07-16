@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Velaud Recorder icon: dark camera body with red record dot -->
+<!-- NOTE: VectorDrawable does not support <circle>; use <path> with arc pathData -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -16,17 +17,13 @@
         android:fillColor="#2C2C2E"
         android:pathData="M80,36 L94,28 L94,70 L80,62 Z"/>
 
-    <!-- White ring around lens -->
-    <circle
+    <!-- White ring around lens: circle at (49,49) r=18 -->
+    <path
         android:fillColor="#FFFFFF"
-        android:cx="49"
-        android:cy="49"
-        android:r="18"/>
+        android:pathData="M 31,49 A 18,18,0,1,0,67,49 A 18,18,0,1,0,31,49 Z"/>
 
-    <!-- Red record dot -->
-    <circle
+    <!-- Red record dot: circle at (49,49) r=11 -->
+    <path
         android:fillColor="#E53935"
-        android:cx="49"
-        android:cy="49"
-        android:r="11"/>
+        android:pathData="M 38,49 A 11,11,0,1,0,60,49 A 11,11,0,1,0,38,49 Z"/>
 </vector>
