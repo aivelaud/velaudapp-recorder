@@ -7,12 +7,13 @@ pluginManagement {
     }
 }
 
+// com.facebook.react.settings plugin registers "react" extension and
+// automatically calls autolinkLibrariesFromCommandOrDefault() via
+// settingsEvaluated hook — no manual extensions.configure needed.
+// (Manual configure fails because ReactSettingsExtension class is not
+// on the settings script classpath at compilation/evaluation time.)
 plugins {
     id("com.facebook.react.settings")
-}
-
-extensions.configure<com.facebook.react.ReactSettingsExtension> {
-    autolinkLibrariesFromCommand()
 }
 
 rootProject.name = "VelaudRecorder"
