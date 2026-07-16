@@ -1,7 +1,6 @@
 package com.recvelaud.android
 
 import android.app.Application
-import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeHost
@@ -15,20 +14,38 @@ import com.recvelaud.android.modules.RecorderPackage
 import com.recvelaud.android.modules.FloatingPanelPackage
 import com.recvelaud.android.modules.VideoLibraryPackage
 
+// Auto-linked third-party packages (explicitly registered for old arch compatibility)
+import com.swmansion.rnscreens.RNScreensPackage
+import com.th3rdwave.safeareacontext.SafeAreaContextPackage
+import com.oblador.vectoricons.VectorIconsPackage
+import com.brentvatne.react.ReactVideoPackage
+import io.invertase.googlemobileads.ReactNativeGoogleMobileAdsPackage
+import com.reactnativecommunity.asyncstorage.AsyncStoragePackage
+import cl.json.rnshare.RNSharePackage
+
 class MainApplication : Application(), ReactApplication {
 
     override val reactNativeHost: ReactNativeHost =
         object : DefaultReactNativeHost(this) {
-            override fun getPackages(): List<ReactPackage> {
-                // PackageList auto-links all third-party native modules
-                // (react-native-screens, safe-area-context, vector-icons, etc.)
-                val packages = PackageList(this).packages.toMutableList()
-                // Add custom native modules that are not auto-linked
-                packages.add(RecorderPackage())
-                packages.add(FloatingPanelPackage())
-                packages.add(VideoLibraryPackage())
-                return packages
-            }
+            override fun getPackages(): List<ReactPackage> = listOf(
+                // Navigation & UI framework packages
+                RNScreensPackage(),
+                SafeAreaContextPackage(),
+                // Media playback
+                ReactVideoPackage(),
+                // Icon fonts
+                VectorIconsPackage(),
+                // Persistent storage
+                AsyncStoragePackage(),
+                // AdMob bridge
+                ReactNativeGoogleMobileAdsPackage(),
+                // Share sheet
+                RNSharePackage(),
+                // Custom native modules
+                RecorderPackage(),
+                FloatingPanelPackage(),
+                VideoLibraryPackage()
+            )
 
             override fun getJSMainModuleName(): String = "index"
 
