@@ -39,21 +39,30 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      # ── Download gradle-wrapper.jar from Gradle distribution ──
-      - name: Download gradle-wrapper.jar
+      # ── Generate gradle-wrapper.jar via minimal isolated project ─
+      - name: Generate gradle-wrapper.jar
         run: |
+          # Install Gradle via SDKMAN to generate the wrapper
           GRADLE_VERSION="8.6"
-          echo "Downloading Gradle $GRADLE_VERSION distribution to extract wrapper jar..."
+          
+          # Install Gradle using apt or direct binary
+          mkdir -p /tmp/gradle-install
           curl -fL "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
-            -o /tmp/gradle-dist.zip
-          # Extract only the wrapper jar from the distribution
-          unzip -p /tmp/gradle-dist.zip \
-            "gradle-${GRADLE_VERSION}/lib/gradle-wrapper-${GRADLE_VERSION}.jar" \
-            > android/gradle/wrapper/gradle-wrapper.jar || \
-          unzip -p /tmp/gradle-dist.zip \
-            "gradle-${GRADLE_VERSION}/lib/gradle-wrapper.jar" \
-            > android/gradle/wrapper/gradle-wrapper.jar
-          ls -lh android/gradle/wrapper/gradle-wrapper.jar
+            -o /tmp/gradle-install/gradle.zip
+          unzip -q /tmp/gradle-install/gradle.zip -d /tmp/gradle-install/
+          export GRADLE_BIN="/tmp/gradle-install/gradle-${GRADLE_VERSION}/bin/gradle"
+          chmod +x "$GRADLE_BIN"
+          
+          # Create a minimal isolated project to generate the wrapper
+          TMPDIR=$(mktemp -d)
+          echo "" > "$TMPDIR/settings.gradle"
+          cd "$TMPDIR"
+          "$GRADLE_BIN" wrapper --gradle-version "${GRADLE_VERSION}" --distribution-type bin
+          
+          # Copy the generated jar back
+          cp gradle/wrapper/gradle-wrapper.jar \
+            "$GITHUB_WORKSPACE/android/gradle/wrapper/gradle-wrapper.jar"
+          ls -lh "$GITHUB_WORKSPACE/android/gradle/wrapper/gradle-wrapper.jar"
           echo "gradle-wrapper.jar ready"
 
       # ── Setup Android SDK ─────────────────────────────────────
