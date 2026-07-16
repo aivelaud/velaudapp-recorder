@@ -35,15 +35,54 @@ jobs:
       - name: Install npm dependencies
         run: npm install --legacy-peer-deps
 
-      # ── Patch RN gradle plugin (foojay removal for CI) ─────────
-      # Gradle 8.4 compatible — no internal API patches needed.
-      # Remove foojay-resolver-convention which is not needed in CI.
+      # ── Patch react-native gradle plugin ──────────────────────────────────
+      # 1) Remove foojay-resolver-convention (not available in CI)
+      # 2) Remove serviceOf<ModuleRegistry>() from react-native-gradle-plugin/build.gradle.kts
+      #    This Gradle internal API was removed in Gradle 8.x. Its presence in a testRuntimeOnly()
+      #    call causes the entire react-native-gradle-plugin subproject to fail to compile,
+      #    which means com.facebook.react.rootproject is never registered → "Plugin not found".
       - name: Patch react-native gradle plugin (CI compat)
         run: |
+          # Patch 1 — settings.gradle.kts: remove foojay resolver (not in CI)
           SETTINGS="node_modules/@react-native/gradle-plugin/settings.gradle.kts"
           if [ -f "$SETTINGS" ]; then
-            sed -i "/foojay-resolver-convention/d" "$SETTINGS"
-            echo "Patched: removed foojay-resolver-convention"
+            sed -i '/foojay-resolver-convention/d' "$SETTINGS"
+            echo "Patched settings.gradle.kts: removed foojay-resolver-convention"
+          fi
+
+          # Patch 2 — react-native-gradle-plugin/build.gradle.kts
+          # Write JS patcher to /tmp (avoids shell quoting issues), then run with node.
+          PLUGIN_BUILD="node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/build.gradle.kts"
+          if [ -f "$PLUGIN_BUILD" ]; then
+            echo "--- serviceOf lines before patch ---"
+            grep -n 'serviceOf\|ModuleRegistry' "$PLUGIN_BUILD" || echo "(none found)"
+
+            node - "$PLUGIN_BUILD" << 'JSEOF'
+const fs = require('fs');
+const filePath = process.argv[2];
+let src = fs.readFileSync(filePath, 'utf8');
+let out = src;
+// Remove: testRuntimeOnly(serviceOf<ModuleRegistry>()) line
+out = out.replace(/[ \t]*testRuntimeOnly\(serviceOf<ModuleRegistry>\(\)\)[ \t]*\r?\n?/g, '');
+// Remove: any import line referencing serviceOf
+out = out.replace(/[ \t]*import[^\n]*serviceOf[^\n]*\r?\n?/g, '');
+const changed = src !== out;
+fs.writeFileSync(filePath, out);
+console.log('Patch result:', changed ? 'CHANGED — serviceOf<ModuleRegistry>() removed' : 'NO CHANGE — pattern not found');
+if (!changed) {
+  src.split('\n').forEach((l, i) => {
+    if (/testRuntime|serviceOf|ModuleRegistry/.test(l)) {
+      console.log('  L' + (i + 1) + ': ' + l);
+    }
+  });
+}
+JSEOF
+
+            echo "--- serviceOf lines after patch ---"
+            grep -n 'serviceOf\|ModuleRegistry' "$PLUGIN_BUILD" || echo "(none — patch OK)"
+          else
+            echo "WARNING: $PLUGIN_BUILD not found — listing gradle-plugin dir:"
+            ls node_modules/@react-native/gradle-plugin/ || true
           fi
 
       # ── Gradle wrapper permissions ────────────────────────────
