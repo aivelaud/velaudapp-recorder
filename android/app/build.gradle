@@ -78,21 +78,23 @@ android {
         }
     }
 
-    // ABI version codes
-    ext.abiCodes = ['armeabi-v7a': 1, 'arm64-v8a': 2, 'x86': 3, 'x86_64': 4]
-    android.applicationVariants.all { variant ->
-        variant.outputs.each { output ->
-            def abiFilter = output.getFilter(com.android.build.OutputFile.ABI)
-            def abiVersionCode = project.ext.abiCodes.get(abiFilter)
-            if (abiVersionCode != null) {
-                output.versionCodeOverride = abiVersionCode * 1000 + variant.versionCode
-            }
-        }
-    }
-
     packagingOptions {
         pickFirst '**/libc++_shared.so'
         pickFirst '**/libfbjni.so'
+    }
+}
+
+// ABI version codes — must be at project scope (not inside android{}) so that
+// project.ext.abiCodes is resolvable in the applicationVariants callback.
+// versionCodeOverride is deprecated in AGP 8.x but still functional.
+project.ext.abiCodes = ['armeabi-v7a': 1, 'arm64-v8a': 2, 'x86': 3, 'x86_64': 4]
+android.applicationVariants.all { variant ->
+    variant.outputs.each { output ->
+        def abiFilter = output.getFilter(com.android.build.OutputFile.ABI)
+        def abiVersionCode = project.ext.abiCodes.get(abiFilter)
+        if (abiVersionCode != null) {
+            output.versionCodeOverride = abiVersionCode * 1000 + variant.versionCode
+        }
     }
 }
 
