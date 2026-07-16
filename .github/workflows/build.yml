@@ -38,13 +38,6 @@ jobs:
       # ── Patch react-native gradle plugin ──────────────────────────────────
       # 1) Remove foojay-resolver-convention (not available in CI)
       # 2) Remove the entire testRuntimeOnly block containing serviceOf<ModuleRegistry>():
-      #      testRuntimeOnly(
-      #          serviceOf<ModuleRegistry>()
-      #              .getModule(ToolingApiJarProvider::class.java)
-      #              .classpath
-      #      )
-      #    Patcher is paren-depth-aware so it removes all 5 lines safely.
-      #    Also removes both import lines (serviceOf + ModuleRegistry).
       #    JS patcher is base64-encoded (syntax+logic verified) to avoid YAML issues.
       - name: Patch react-native gradle plugin (CI compat)
         run: |
@@ -60,7 +53,7 @@ jobs:
           if [ -f "$PLUGIN_BUILD" ]; then
             echo "--- serviceOf/ModuleRegistry lines BEFORE patch ---"
             grep -n 'serviceOf\|ModuleRegistry' "$PLUGIN_BUILD" || echo "(none found)"
-            echo "Y29uc3QgZnMgPSByZXF1aXJlKCdmcycpOwpjb25zdCBmaWxlUGF0aCA9IHByb2Nlc3MuYXJndlsyXTsKY29uc3Qgc3JjID0gZnMucmVhZEZpbGVTeW5jKGZpbGVQYXRoLCAndXRmOCcpOwpjb25zdCBsaW5lcyA9IHNyYy5zcGxpdCgnXG4nKTsKY29uc3QgcmVzdWx0ID0gW107CmxldCBpID0gMDsKbGV0IHJlbW92ZWRCbG9ja3MgPSAwOwpsZXQgcmVtb3ZlZEltcG9ydHMgPSAwOwoKd2hpbGUgKGkgPCBsaW5lcy5sZW5ndGgpIHsKICBjb25zdCBsaW5lID0gbGluZXNbaV07CgogIC8vIERldGVjdCBzdGFydCBvZiBtdWx0aWxpbmUgdGVzdFJ1bnRpbWVPbmx5KCBibG9jayAobm8gY2xvc2luZyBwYXJlbiBvbiBzYW1lIGxpbmUpCiAgaWYgKC9eWyBcdF0qdGVzdFJ1bnRpbWVPbmx5XCgvLnRlc3QobGluZSkgJiYgIS9cKVsgXHRdKiQvLnRlc3QobGluZS5yZXBsYWNlKC9cKC4qXCkvZywgJycpKSkgewogICAgLy8gQ29sbGVjdCBlbnRpcmUgYmxvY2sgYnkgdHJhY2tpbmcgcGFyZW4gZGVwdGgKICAgIGNvbnN0IGJsb2NrTGluZXMgPSBbbGluZV07CiAgICBsZXQgZGVwdGggPSAwOwogICAgZm9yIChjb25zdCBjIG9mIGxpbmUpIHsgaWYgKGMgPT09ICcoJykgZGVwdGgrKzsgZWxzZSBpZiAoYyA9PT0gJyknKSBkZXB0aC0tOyB9CiAgICBpKys7CiAgICB3aGlsZSAoaSA8IGxpbmVzLmxlbmd0aCAmJiBkZXB0aCA+IDApIHsKICAgICAgY29uc3QgbCA9IGxpbmVzW2ldOwogICAgICBmb3IgKGNvbnN0IGMgb2YgbCkgeyBpZiAoYyA9PT0gJygnKSBkZXB0aCsrOyBlbHNlIGlmIChjID09PSAnKScpIGRlcHRoLS07IH0KICAgICAgYmxvY2tMaW5lcy5wdXNoKGwpOwogICAgICBpKys7CiAgICB9CiAgICBjb25zdCBibG9ja1N0ciA9IGJsb2NrTGluZXMuam9pbignXG4nKTsKICAgIGlmIChibG9ja1N0ci5pbmNsdWRlcygnc2VydmljZU9mJykgfHwgYmxvY2tTdHIuaW5jbHVkZXMoJ01vZHVsZVJlZ2lzdHJ5JykpIHsKICAgICAgcmVtb3ZlZEJsb2NrcysrOwogICAgICBjb25zb2xlLmxvZygnUmVtb3ZlZCB0ZXN0UnVudGltZU9ubHkgYmxvY2sgKCcgKyBibG9ja0xpbmVzLmxlbmd0aCArICcgbGluZXMpOicpOwogICAgICBibG9ja0xpbmVzLmZvckVhY2goZnVuY3Rpb24obCkgeyBjb25zb2xlLmxvZygnICAnICsgbCk7IH0pOwogICAgfSBlbHNlIHsKICAgICAgcmVzdWx0LnB1c2guYXBwbHkocmVzdWx0LCBibG9ja0xpbmVzKTsKICAgIH0KICAgIGNvbnRpbnVlOwogIH0KCiAgLy8gRGV0ZWN0IHNpbmdsZS1saW5lIHRlc3RSdW50aW1lT25seShzZXJ2aWNlT2Y8TW9kdWxlUmVnaXN0cnk+KCkuLi4pCiAgaWYgKC9bIFx0XSp0ZXN0UnVudGltZU9ubHlcKC4qc2VydmljZU9mLipcKS8udGVzdChsaW5lKSkgewogICAgcmVtb3ZlZEJsb2NrcysrOwogICAgY29uc29sZS5sb2coJ1JlbW92ZWQgc2luZ2xlLWxpbmUgdGVzdFJ1bnRpbWVPbmx5IGJsb2NrOiAnICsgbGluZS50cmltKCkpOwogICAgaSsrOwogICAgY29udGludWU7CiAgfQoKICAvLyBSZW1vdmUgaW1wb3J0IGxpbmVzIGZvciBzZXJ2aWNlT2Ygb3IgTW9kdWxlUmVnaXN0cnkKICBpZiAoL15bIFx0XSppbXBvcnRbXlxuXSooc2VydmljZU9mfE1vZHVsZVJlZ2lzdHJ5KS8udGVzdChsaW5lKSkgewogICAgcmVtb3ZlZEltcG9ydHMrKzsKICAgIGNvbnNvbGUubG9nKCdSZW1vdmVkIGltcG9ydDogJyArIGxpbmUudHJpbSgpKTsKICAgIGkrKzsKICAgIGNvbnRpbnVlOwogIH0KCiAgcmVzdWx0LnB1c2gobGluZSk7CiAgaSsrOwp9Cgpjb25zdCBvdXQgPSByZXN1bHQuam9pbignXG4nKTsKY29uc3QgY2hhbmdlZCA9IHNyYyAhPT0gb3V0Owpmcy53cml0ZUZpbGVTeW5jKGZpbGVQYXRoLCBvdXQpOwpjb25zb2xlLmxvZygnUGF0Y2ggcmVzdWx0OicsIGNoYW5nZWQgPyAnQ0hBTkdFRCcgOiAnTk8gQ0hBTkdFJyk7CmNvbnNvbGUubG9nKCdSZW1vdmVkIGJsb2NrczonLCByZW1vdmVkQmxvY2tzLCAnfCBSZW1vdmVkIGltcG9ydHM6JywgcmVtb3ZlZEltcG9ydHMpOwpjb25zb2xlLmxvZygnUmVtYWluaW5nIHNlcnZpY2VPZi9Nb2R1bGVSZWdpc3RyeSBsaW5lczonKTsKcmVzdWx0LmZvckVhY2goZnVuY3Rpb24obCwgaWR4KSB7CiAgaWYgKC9zZXJ2aWNlT2Z8TW9kdWxlUmVnaXN0cnkvLnRlc3QobCkpIHsgY29uc29sZS5sb2coJyAgTCcgKyAoaWR4ICsgMSkgKyAnOiAnICsgbCk7IH0KfSk7Cg==" \
+            echo "Y29uc3QgZnMgPSByZXF1aXJlKCdmcycpOwpjb25zdCBmaWxlUGF0aCA9IHByb2Nlc3MuYXJndlsyXTsKY29uc3Qgc3JjID0gZnMucmVhZEZpbGVTeW5jKGZpbGVQYXRoLCAndXRmOCcpOwpjb25zdCBsaW5lcyA9IHNyYy5zcGxpdCgnXG4nKTsKY29uc3QgcmVzdWx0ID0gW107CmxldCBpID0gMDsKbGV0IHJlbW92ZWRCbG9ja3MgPSAwOwpsZXQgcmVtb3ZlZEltcG9ydHMgPSAwOwp3aGlsZSAoaSA8IGxpbmVzLmxlbmd0aCkgewogIGNvbnN0IGxpbmUgPSBsaW5lc1tpXTsKICBpZiAoL15bIFx0XSp0ZXN0UnVudGltZU9ubHlcKC8udGVzdChsaW5lKSAmJiAhL1wpWyBcdF0qJC8udGVzdChsaW5lLnJlcGxhY2UoL1woLipcKS9nLCAnJykpKSB7CiAgICBjb25zdCBibG9ja0xpbmVzID0gW2xpbmVdOwogICAgbGV0IGRlcHRoID0gMDsKICAgIGZvciAoY29uc3QgYyBvZiBsaW5lKSB7IGlmIChjID09PSAnKCcpIGRlcHRoKys7IGVsc2UgaWYgKGMgPT09ICcpJykgZGVwdGgtLTsgfQogICAgaSsrOwogICAgd2hpbGUgKGkgPCBsaW5lcy5sZW5ndGggJiYgZGVwdGggPiAwKSB7CiAgICAgIGNvbnN0IGwgPSBsaW5lc1tpXTsKICAgICAgZm9yIChjb25zdCBjIG9mIGwpIHsgaWYgKGMgPT09ICcoJykgZGVwdGgrKzsgZWxzZSBpZiAoYyA9PT0gJyknKSBkZXB0aC0tOyB9CiAgICAgIGJsb2NrTGluZXMucHVzaChsKTsKICAgICAgaSsrOwogICAgfQogICAgY29uc3QgYmxvY2tTdHIgPSBibG9ja0xpbmVzLmpvaW4oJ1xuJyk7CiAgICBpZiAoYmxvY2tTdHIuaW5jbHVkZXMoJ3NlcnZpY2VPZicpIHx8IGJsb2NrU3RyLmluY2x1ZGVzKCdNb2R1bGVSZWdpc3RyeScpKSB7CiAgICAgIHJlbW92ZWRCbG9ja3MrKzsKICAgIH0gZWxzZSB7CiAgICAgIHJlc3VsdC5wdXNoLmFwcGx5KHJlc3VsdCwgYmxvY2tMaW5lcyk7CiAgICB9CiAgICBjb250aW51ZTsKICB9CiAgaWYgKC9bIFx0XSp0ZXN0UnVudGltZU9ubHlcKC4qc2VydmljZU9mLipcKS8udGVzdChsaW5lKSkgewogICAgcmVtb3ZlZEJsb2NrcysrOwogICAgaSsrOwogICAgY29udGludWU7CiAgfQogIGlmICgvXlsgXHRdKmltcG9ydFteXG5dKihzZXJ2aWNlT2Z8TW9kdWxlUmVnaXN0cnkpLy50ZXN0KGxpbmUpKSB7CiAgICByZW1vdmVkSW1wb3J0cysrOwogICAgaSsrOwogICAgY29udGludWU7CiAgfQogIHJlc3VsdC5wdXNoKGxpbmUpOwogIGkrKzsKfQpjb25zdCBvdXQgPSByZXN1bHQuam9pbignXG4nKTsKZnMud3JpdGVGaWxlU3luYyhmaWxlUGF0aCwgb3V0KTsKY29uc29sZS5sb2coJ1BhdGNoIHJlc3VsdDogUmVtb3ZlZCBibG9ja3M6JywgcmVtb3ZlZEJsb2NrcywgJ3wgUmVtb3ZlZCBpbXBvcnRzOicsIHJlbW92ZWRJbXBvcnRzKTsK" \
               | base64 -d > /tmp/patch_rn.js
             node /tmp/patch_rn.js "$PLUGIN_BUILD"
             echo "--- serviceOf/ModuleRegistry lines AFTER patch ---"
@@ -77,24 +70,17 @@ jobs:
       # ── Generate gradle-wrapper.jar via minimal isolated project ─
       - name: Generate gradle-wrapper.jar
         run: |
-          # Download Gradle 8.4 binary to generate the wrapper (matches gradle-wrapper.properties)
           GRADLE_VERSION="8.4"
-          
-          # Install Gradle using apt or direct binary
           mkdir -p /tmp/gradle-install
           curl -fL "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
             -o /tmp/gradle-install/gradle.zip
           unzip -q /tmp/gradle-install/gradle.zip -d /tmp/gradle-install/
           export GRADLE_BIN="/tmp/gradle-install/gradle-${GRADLE_VERSION}/bin/gradle"
           chmod +x "$GRADLE_BIN"
-          
-          # Create a minimal isolated project to generate the wrapper
           TMPDIR=$(mktemp -d)
           echo "" > "$TMPDIR/settings.gradle"
           cd "$TMPDIR"
           "$GRADLE_BIN" wrapper --gradle-version "${GRADLE_VERSION}" --distribution-type bin
-          
-          # Copy the generated jar back
           cp gradle/wrapper/gradle-wrapper.jar \
             "$GITHUB_WORKSPACE/android/gradle/wrapper/gradle-wrapper.jar"
           ls -lh "$GITHUB_WORKSPACE/android/gradle/wrapper/gradle-wrapper.jar"
@@ -121,22 +107,17 @@ jobs:
             -keypass android \
             -dname "CN=Android Debug,O=Android,C=US"
 
-      # ── ADIM A: assembleRelease (Gradle ABI/density splits) ────
-      - name: Build Release APKs (Gradle ABI splits — ADIM A)
+      # ── Build Release APKs ────────────────────────────────────
+      - name: Build Release APKs
         working-directory: android
         run: ./gradlew assembleRelease --stacktrace --no-daemon
 
-      # ── ADIM A: assembleDebug (universal debug APK) ───────────
-      - name: Build Debug APK
-        working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
-
-      # ── ADIM B Step 1: bundleRelease (.aab) ───────────────────
-      - name: Build Release AAB (ADIM B — Step 1)
+      # ── Build Release AAB ─────────────────────────────────────
+      - name: Build Release AAB
         working-directory: android
         run: ./gradlew bundleRelease --stacktrace --no-daemon
 
-      # ── ADIM B Step 2: Verify .aab exists ─────────────────────
+      # ── Verify AAB exists ─────────────────────────────────────
       - name: Verify AAB exists
         run: |
           AAB=$(find android/app/build/outputs/bundle -name "*.aab" | head -1)
@@ -148,125 +129,32 @@ jobs:
           echo "Found AAB: $AAB"
           ls -lh "$AAB"
 
-      # ── ADIM B Step 3: Install bundletool ─────────────────────
-      - name: Install bundletool
-        run: |
-          BUNDLETOOL_VERSION="1.15.6"
-          curl -fL "https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar" \
-            -o /usr/local/bin/bundletool.jar
-          echo '#!/bin/sh
-          exec java -jar /usr/local/bin/bundletool.jar "$@"' > /usr/local/bin/bundletool
-          chmod +x /usr/local/bin/bundletool
-          bundletool version
-
-      # ── ADIM B Step 4: Universal APK from AAB ─────────────────
-      - name: Build universal APK from AAB (ADIM B — universal)
-        run: |
-          bundletool build-apks \
-            --bundle="${{ env.AAB_PATH }}" \
-            --output=android/app/build/outputs/app-release-universal.apks \
-            --mode=universal \
-            --ks=android/app/debug.keystore \
-            --ks-pass=pass:android \
-            --ks-key-alias=androiddebugkey \
-            --key-pass=pass:android
-          # Extract base.apk from universal
-          cd android/app/build/outputs
-          unzip -o app-release-universal.apks -d universal-extracted/
-          ls -lh universal-extracted/
-
-      # ── ADIM B Step 5: Split APKs from AAB ────────────────────
-      - name: Build split APKs from AAB (ADIM B — splits)
-        run: |
-          bundletool build-apks \
-            --bundle="${{ env.AAB_PATH }}" \
-            --output=android/app/build/outputs/app-release-splits.apks \
-            --ks=android/app/debug.keystore \
-            --ks-pass=pass:android \
-            --ks-key-alias=androiddebugkey \
-            --key-pass=pass:android
-          # Extract split APKs
-          mkdir -p android/app/build/outputs/splits-extracted
-          cd android/app/build/outputs
-          unzip -o app-release-splits.apks -d splits-extracted/
-          echo "=== Split APKs produced ==="
-          ls -lh splits-extracted/
-
-      # ── List all build outputs ─────────────────────────────────
-      - name: List all build outputs
-        run: |
-          echo "=== ADIM A: Gradle ABI splits (assembleRelease) ==="
-          find android/app/build/outputs/apk/release -name "*.apk" -exec ls -lh {} \;
-          echo ""
-          echo "=== Debug APK (assembleDebug) ==="
-          find android/app/build/outputs/apk/debug -name "*.apk" -exec ls -lh {} \;
-          echo ""
-          echo "=== ADIM B: AAB file ==="
-          ls -lh "${{ env.AAB_PATH }}"
-          echo ""
-          echo "=== ADIM B: Universal APK (base.apk) ==="
-          ls -lh android/app/build/outputs/universal-extracted/ 2>/dev/null || true
-          echo ""
-          echo "=== ADIM B: Split APKs ==="
-          ls -lh android/app/build/outputs/splits-extracted/ 2>/dev/null || true
-
-      # ── Upload ADIM A: Gradle release APKs ────────────────────
-      - name: Upload ADIM-A Release APKs (Gradle splits)
+      # ── Upload release-aab ────────────────────────────────────
+      - name: Upload release-aab
         uses: actions/upload-artifact@v4
         with:
-          name: adim-a-release-apks-gradle-splits
-          path: android/app/build/outputs/apk/release/*.apk
-          retention-days: 14
-
-      # ── Upload Debug APK ───────────────────────────────────────
-      - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-apk-universal
-          path: android/app/build/outputs/apk/debug/*.apk
-          retention-days: 14
-
-      # ── Upload ADIM B: AAB ─────────────────────────────────────
-      - name: Upload ADIM-B AAB file
-        uses: actions/upload-artifact@v4
-        with:
-          name: adim-b-release-aab
+          name: release-aab
           path: ${{ env.AAB_PATH }}
           retention-days: 14
 
-      # ── Upload ADIM B: base.apk (universal) ───────────────────
-      - name: Upload ADIM-B Universal base.apk
+      # ── Upload release-apks ───────────────────────────────────
+      - name: Upload release-apks
         uses: actions/upload-artifact@v4
         with:
-          name: adim-b-universal-base-apk
-          path: android/app/build/outputs/universal-extracted/
+          name: release-apks
+          path: android/app/build/outputs/apk/release/
           retention-days: 14
 
-      # ── Upload ADIM B: split_config APKs ──────────────────────
-      - name: Upload ADIM-B Split Config APKs
-        uses: actions/upload-artifact@v4
-        with:
-          name: adim-b-split-config-apks
-          path: android/app/build/outputs/splits-extracted/
-          retention-days: 14
-
-      # ── Summary ───────────────────────────────────────────────
+      # ── Build Summary ─────────────────────────────────────────
       - name: Build Summary
         run: |
           echo "## ✅ Velaud Recorder Build Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### ADIM A — Gradle ABI/density splits" >> $GITHUB_STEP_SUMMARY
-          find android/app/build/outputs/apk/release -name "*.apk" | while read f; do
-            SIZE=$(du -h "$f" | cut -f1)
-            echo "- \`$(basename $f)\` — $SIZE" >> $GITHUB_STEP_SUMMARY
-          done
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### ADIM B — AAB + bundletool splits" >> $GITHUB_STEP_SUMMARY
+          echo "### release-aab" >> $GITHUB_STEP_SUMMARY
           echo "- \`$(basename ${{ env.AAB_PATH }})\` — $(du -h ${{ env.AAB_PATH }} | cut -f1)" >> $GITHUB_STEP_SUMMARY
-          echo "- Split APKs: base.apk + split_config.*.apk (ABI, dil, density)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Debug APK" >> $GITHUB_STEP_SUMMARY
-          find android/app/build/outputs/apk/debug -name "*.apk" | while read f; do
+          echo "### release-apks" >> $GITHUB_STEP_SUMMARY
+          find android/app/build/outputs/apk/release -name "*.apk" | while read f; do
             SIZE=$(du -h "$f" | cut -f1)
             echo "- \`$(basename $f)\` — $SIZE" >> $GITHUB_STEP_SUMMARY
           done
