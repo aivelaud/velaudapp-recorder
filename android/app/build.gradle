@@ -58,15 +58,16 @@ android {
         jvmTarget = "17"
     }
 
-    // Fix AGP 8.x: RN gradle plugin generates PackageList.kt at
-    // project.buildDir/generated/rncli/src/main/java (NOT rootProject.buildDir)
+    // Register both possible locations where the RN gradle plugin
+    // might emit PackageList.kt (varies by plugin version / AGP version)
     sourceSets {
         main {
             java.srcDir("${project.buildDir}/generated/rncli/src/main/java")
+            java.srcDir("${rootProject.buildDir}/generated/autolinking/src/main/java")
         }
     }
 
-    // ABI splits only – produces exactly the needed APKs, no density/language bloat
+    // ABI splits only – no density/language bloat
     splits {
         abi {
             enable true
@@ -79,13 +80,6 @@ android {
     packagingOptions {
         pickFirst '**/libc++_shared.so'
         pickFirst '**/libfbjni.so'
-    }
-}
-
-// Make every Kotlin compile task wait for PackageList generation
-afterEvaluate {
-    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-        dependsOn("generatePackageList")
     }
 }
 
