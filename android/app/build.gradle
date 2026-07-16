@@ -45,7 +45,7 @@ android {
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
-            signingConfig signingConfigs.debug // use debug for CI; replace with release for production
+            signingConfig signingConfigs.debug
         }
     }
 
@@ -58,23 +58,13 @@ android {
         jvmTarget = "17"
     }
 
-    // ─── ADIM A: Gradle ABI / density / language splits ────────────────────
+    // ABI splits only - produces exactly the 5 APKs needed
     splits {
         abi {
             enable true
             reset()
             include "arm64-v8a", "armeabi-v7a", "x86_64", "x86"
             universalApk true
-        }
-        density {
-            enable true
-            reset()
-            include "mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"
-        }
-        language {
-            enable true
-            // includeSplits was removed in AGP 8.x; language splits are
-            // auto-detected from resource qualifiers when enable=true.
         }
     }
 
@@ -84,9 +74,6 @@ android {
     }
 }
 
-// ABI version codes — must be at project scope (not inside android{}) so that
-// project.ext.abiCodes is resolvable in the applicationVariants callback.
-// versionCodeOverride is deprecated in AGP 8.x but still functional.
 project.ext.abiCodes = ['armeabi-v7a': 1, 'arm64-v8a': 2, 'x86': 3, 'x86_64': 4]
 android.applicationVariants.all { variant ->
     variant.outputs.each { output ->
@@ -99,18 +86,14 @@ android.applicationVariants.all { variant ->
 }
 
 dependencies {
-    // React Native
     implementation("com.facebook.react:react-android")
     implementation("com.facebook.react:hermes-android")
 
-    // Kotlin
     implementation "org.jetbrains.kotlin:kotlin-stdlib:${rootProject.ext.kotlinVersion}"
 
-    // AndroidX
     implementation 'androidx.core:core-ktx:1.13.1'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.multidex:multidex:2.0.1'
 
-    // Google Play Services (AdMob)
     implementation 'com.google.android.gms:play-services-ads:23.2.0'
 }
