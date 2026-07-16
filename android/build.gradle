@@ -1,4 +1,11 @@
 // Top-level build file
+//
+// IMPORTANT: buildscript{} must come before plugins{} in Groovy build files.
+// The plugins{} block uses pluginManagement rules (including composite builds
+// from settings.gradle.kts includeBuild) to resolve plugin IDs.
+// Unlike legacy `apply plugin: "..."`, the plugins{} block DOES work with
+// composite build plugins — this is the fix for Gradle 8.4 where legacy apply
+// cannot resolve com.facebook.react.rootproject from the @react-native composite.
 buildscript {
     ext {
         buildToolsVersion = "35.0.0"
@@ -19,7 +26,11 @@ buildscript {
     }
 }
 
-apply plugin: "com.facebook.react.rootproject"
+plugins {
+    // Resolved from the composite build included in settings.gradle.kts.
+    // Must use plugins{} (not legacy apply plugin:) for composite-build plugins.
+    id "com.facebook.react.rootproject"
+}
 
 allprojects {
     repositories {
