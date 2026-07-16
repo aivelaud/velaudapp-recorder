@@ -7,6 +7,8 @@ pluginManagement {
     }
 }
 
+apply plugin: "com.facebook.react.settings"
+
 rootProject.name = 'VelaudRecorder'
 include ':app'
 includeBuild('../node_modules/@react-native/gradle-plugin')
