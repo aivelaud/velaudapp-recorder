@@ -89,7 +89,7 @@ jobs:
       # ── ADIM A: assembleRelease (Gradle ABI/density splits) ────
       - name: Build Release APKs (Gradle ABI splits — ADIM A)
         working-directory: android
-        run: ./gradlew assembleRelease --stacktrace --no-daemon
+        run: ./gradlew assembleRelease --stacktrace --no-daemon --info 2>&1 | tail -300
 
       # ── ADIM A: assembleDebug (universal debug APK) ───────────
       - name: Build Debug APK
