@@ -21,6 +21,17 @@
 -keep class androidx.** { *; }
 -dontwarn androidx.**
 
+# ── Autolinked third-party RN packages ──────────────────────────────────────
+# PackageList.kt instantiates these via reflection at runtime. R8 must keep
+# them even though they are not referenced by direct import in source code.
+-keep class com.swmansion.rnscreens.** { *; }
+-keep class com.th3rdwave.safeareacontext.** { *; }
+-keep class com.oblador.vectoricons.** { *; }
+-keep class com.brentvatne.react.** { *; }
+-keep class io.invertase.googlemobileads.** { *; }
+-keep class com.reactnativecommunity.asyncstorage.** { *; }
+-keep class cl.json.** { *; }
+
 # Suppress warnings
 -dontwarn okhttp3.**
 -dontwarn okio.**
