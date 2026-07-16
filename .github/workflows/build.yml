@@ -39,11 +39,12 @@ jobs:
       # 1) Remove foojay-resolver-convention (not available in CI)
       # 2) Remove serviceOf<ModuleRegistry>() from react-native-gradle-plugin/build.gradle.kts
       #    This Gradle internal API was removed in Gradle 8.x. Its presence in a testRuntimeOnly()
-      #    call causes the entire react-native-gradle-plugin subproject to fail to compile,
+      #    call causes the react-native-gradle-plugin subproject to fail to compile entirely,
       #    which means com.facebook.react.rootproject is never registered → "Plugin not found".
+      #    JS patcher is base64-encoded to avoid YAML/shell quoting and indentation issues.
       - name: Patch react-native gradle plugin (CI compat)
         run: |
-          # Patch 1 — settings.gradle.kts: remove foojay resolver (not in CI)
+          # Patch 1 — settings.gradle.kts: remove foojay resolver
           SETTINGS="node_modules/@react-native/gradle-plugin/settings.gradle.kts"
           if [ -f "$SETTINGS" ]; then
             sed -i '/foojay-resolver-convention/d' "$SETTINGS"
@@ -51,33 +52,15 @@ jobs:
           fi
 
           # Patch 2 — react-native-gradle-plugin/build.gradle.kts
-          # Write JS patcher to /tmp (avoids shell quoting issues), then run with node.
+          # Decode the JS patcher from base64 → /tmp/patch_rn.js, then run it.
+          # Using base64 avoids all YAML block-scalar / heredoc / shell-quoting problems.
           PLUGIN_BUILD="node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/build.gradle.kts"
           if [ -f "$PLUGIN_BUILD" ]; then
             echo "--- serviceOf lines before patch ---"
             grep -n 'serviceOf\|ModuleRegistry' "$PLUGIN_BUILD" || echo "(none found)"
-
-            node - "$PLUGIN_BUILD" << 'JSEOF'
-const fs = require('fs');
-const filePath = process.argv[2];
-let src = fs.readFileSync(filePath, 'utf8');
-let out = src;
-// Remove: testRuntimeOnly(serviceOf<ModuleRegistry>()) line
-out = out.replace(/[ \t]*testRuntimeOnly\(serviceOf<ModuleRegistry>\(\)\)[ \t]*\r?\n?/g, '');
-// Remove: any import line referencing serviceOf
-out = out.replace(/[ \t]*import[^\n]*serviceOf[^\n]*\r?\n?/g, '');
-const changed = src !== out;
-fs.writeFileSync(filePath, out);
-console.log('Patch result:', changed ? 'CHANGED — serviceOf<ModuleRegistry>() removed' : 'NO CHANGE — pattern not found');
-if (!changed) {
-  src.split('\n').forEach((l, i) => {
-    if (/testRuntime|serviceOf|ModuleRegistry/.test(l)) {
-      console.log('  L' + (i + 1) + ': ' + l);
-    }
-  });
-}
-JSEOF
-
+            echo "Y29uc3QgZnMgPSByZXF1aXJlKCdmcycpOwpjb25zdCBmaWxlUGF0aCA9IHByb2Nlc3MuYXJndlsyXTsKbGV0IHNyYyA9IGZzLnJlYWRGaWxlU3luYyhmaWxlUGF0aCwgJ3V0ZjgnKTsKbGV0IG91dCA9IHNyYzsKLy8gUmVtb3ZlIHRlc3RSdW50aW1lT25seShzZXJ2aWNlT2Y8TW9kdWxlUmVnaXN0cnk+KCkpIOKAlCBpbnRlcm5hbCBHcmFkbGUgQVBJIHJlbW92ZWQgaW4gOC54Cm91dCA9IG91dC5yZXBsYWNlKC9bIFx0XSp0ZXN0UnVudGltZU9ubHlcKHNlcnZpY2VPZjxNb2R1bGVSZWdpc3RyeT5cKFwpXClbIFx0XSpccj9cbj8vZywgJycpOwovLyBSZW1vdmUgYW55IGltcG9ydCBsaW5lIHJlZmVyZW5jaW5nIHNlcnZpY2VPZgpvdXQgPSBvdXQucmVwbGFjZSgvWyBcdF0qaW1wb3J0W15cbl0qc2VydmljZU9mW15cbl0qXHI/XG4/L2csICcnKTsKY29uc3QgY2hhbmdlZCA9IHNyYyAhPT0gb3V0Owpmcy53cml0ZUZpbGVTeW5jKGZpbGVQYXRoLCBvdXQpOwpjb25zb2xlLmxvZygnUGF0Y2ggcmVzdWx0OicsIGNoYW5nZWQgPyAnQ0hBTkdFRCAtIHNlcnZpY2VPZjxNb2R1bGVSZWdpc3RyeT4oKSByZW1vdmVkJyA6ICdOTyBDSEFOR0UgLSBwYXR0ZXJuIG5vdCBmb3VuZCcpOwppZiAoIWNoYW5nZWQpIHsKICBzcmMuc3BsaXQoJ1xuJykuZm9yRWFjaCgobCwgaSkgPT4gewogICAgaWYgKC90ZXN0UnVudGltZXxzZXJ2aWNlT2Z8TW9kdWxlUmVnaXN0cnkvLnRlc3QobCkpIGNvbnNvbGUubG9nKCcgIEwnKyhpKzEpKyc6ICcrbCk7CiAgfSk7Cn0=" \
+              | base64 -d > /tmp/patch_rn.js
+            node /tmp/patch_rn.js "$PLUGIN_BUILD"
             echo "--- serviceOf lines after patch ---"
             grep -n 'serviceOf\|ModuleRegistry' "$PLUGIN_BUILD" || echo "(none — patch OK)"
           else
