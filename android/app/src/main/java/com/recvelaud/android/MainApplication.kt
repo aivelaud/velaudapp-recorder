@@ -1,6 +1,7 @@
 package com.recvelaud.android
 
 import android.app.Application
+import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeHost
@@ -18,22 +19,21 @@ class MainApplication : Application(), ReactApplication {
 
     override val reactNativeHost: ReactNativeHost =
         object : DefaultReactNativeHost(this) {
-            override fun getPackages(): List<ReactPackage> = listOf(
-                // Custom native modules — autolinked PackageList removed because
-                // com.facebook.react plugin's generatePackageList task does not
-                // register its output as a Kotlin source directory in AGP 8.x.
-                // Add any third-party ReactPackage instances here explicitly if
-                // their JS-side APIs are needed at runtime.
-                RecorderPackage(),
-                FloatingPanelPackage(),
-                VideoLibraryPackage()
-            )
+            override fun getPackages(): List<ReactPackage> {
+                // PackageList auto-links all third-party native modules
+                // (react-native-screens, safe-area-context, vector-icons, etc.)
+                val packages = PackageList(this).packages.toMutableList()
+                // Add custom native modules that are not auto-linked
+                packages.add(RecorderPackage())
+                packages.add(FloatingPanelPackage())
+                packages.add(VideoLibraryPackage())
+                return packages
+            }
 
             override fun getJSMainModuleName(): String = "index"
 
             override fun getUseDeveloperSupport(): Boolean = BuildConfig.DEBUG
 
-            // fabricEnabled was removed in RN 0.74; use BuildConfig fields instead.
             override val isNewArchEnabled: Boolean = BuildConfig.IS_NEW_ARCHITECTURE_ENABLED
             override val isHermesEnabled: Boolean = true
         }
@@ -47,7 +47,6 @@ class MainApplication : Application(), ReactApplication {
         if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
             load()
         }
-        // Initialize AdMob
         MobileAds.initialize(this) {}
     }
 }
