@@ -35,6 +35,20 @@ jobs:
       - name: Install npm dependencies
         run: npm install --legacy-peer-deps
 
+      # ── Patch RN gradle plugin: remove foojay toolchain resolver ─
+      # The foojay-resolver-convention plugin causes the included build to
+      # fail silently in CI, making com.facebook.react.* plugins unfindable.
+      - name: Patch react-native gradle plugin (remove foojay)
+        run: |
+          SETTINGS="node_modules/@react-native/gradle-plugin/settings.gradle.kts"
+          if [ -f "$SETTINGS" ]; then
+            sed -i '/foojay-resolver-convention/d' "$SETTINGS"
+            echo "Patched: removed foojay line"
+            cat "$SETTINGS"
+          else
+            echo "Settings file not found at $SETTINGS"
+          fi
+
       # ── Gradle wrapper permissions ────────────────────────────
       - name: Make gradlew executable
         run: chmod +x android/gradlew
@@ -89,7 +103,7 @@ jobs:
       # ── ADIM A: assembleRelease (Gradle ABI/density splits) ────
       - name: Build Release APKs (Gradle ABI splits — ADIM A)
         working-directory: android
-        run: ./gradlew assembleRelease --stacktrace --no-daemon --info 2>&1 | tail -300
+        run: ./gradlew assembleRelease --stacktrace --no-daemon
 
       # ── ADIM A: assembleDebug (universal debug APK) ───────────
       - name: Build Debug APK
