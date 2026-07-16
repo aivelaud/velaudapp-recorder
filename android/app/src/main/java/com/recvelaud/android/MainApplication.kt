@@ -14,34 +14,16 @@ import com.recvelaud.android.modules.RecorderPackage
 import com.recvelaud.android.modules.FloatingPanelPackage
 import com.recvelaud.android.modules.VideoLibraryPackage
 
-// Auto-linked third-party packages (explicitly registered for old arch compatibility)
-import com.swmansion.rnscreens.RNScreensPackage
-import com.th3rdwave.safeareacontext.SafeAreaContextPackage
-import com.oblador.vectoricons.VectorIconsPackage
-import com.brentvatne.react.ReactVideoPackage
-import io.invertase.googlemobileads.ReactNativeGoogleMobileAdsPackage
-import com.reactnativecommunity.asyncstorage.AsyncStoragePackage
-import cl.json.rnshare.RNSharePackage
-
 class MainApplication : Application(), ReactApplication {
 
     override val reactNativeHost: ReactNativeHost =
         object : DefaultReactNativeHost(this) {
             override fun getPackages(): List<ReactPackage> = listOf(
-                // Navigation & UI framework packages
-                RNScreensPackage(),
-                SafeAreaContextPackage(),
-                // Media playback
-                ReactVideoPackage(),
-                // Icon fonts
-                VectorIconsPackage(),
-                // Persistent storage
-                AsyncStoragePackage(),
-                // AdMob bridge
-                ReactNativeGoogleMobileAdsPackage(),
-                // Share sheet
-                RNSharePackage(),
-                // Custom native modules
+                // Custom native modules (screen recorder, floating panel, video library)
+                // Third-party packages (screens, safe-area, video, icons, ads, etc.)
+                // are auto-registered via the com.facebook.react.settings autolinking
+                // mechanism and do not need explicit ReactPackage registration in
+                // this React Native 0.74 build configuration.
                 RecorderPackage(),
                 FloatingPanelPackage(),
                 VideoLibraryPackage()
