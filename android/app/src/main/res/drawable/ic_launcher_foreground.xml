@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive icon foreground — Velaud Recorder
+  Canvas: 108×108 dp  |  Safe zone: 18–90 dp on each axis (72×72 centre)
+  Design: White laptop-screen silhouette + red recording badge (top-right corner)
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- ── Monitor outer frame (white rounded rect) ─────────────── -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="
+          M25,31
+          Q25,26 30,26
+          L78,26
+          Q83,26 83,31
+          L83,70
+          Q83,75 78,75
+          L30,75
+          Q25,75 25,70
+          Z" />
+
+    <!-- ── Screen display area (dark fill = brand background) ───── -->
+    <path
+        android:fillColor="#0F0F0F"
+        android:pathData="M30,32 L78,32 L78,69 L30,69 Z" />
+
+    <!-- ── Play / Video indicator on screen (white, 75% alpha) ──── -->
+    <!-- Triangle: left-edge 43, right-tip 62, vertical centre 50.5 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.75"
+        android:pathData="M43,42 L43,59 L62,50.5 Z" />
+
+    <!-- ── Monitor neck ──────────────────────────────────────────── -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M50,75 L58,75 L61,84 L47,84 Z" />
+
+    <!-- ── Monitor base ──────────────────────────────────────────── -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="
+          M42,82
+          Q42,80 44,80
+          L64,80
+          Q66,80 66,82
+          L66,84
+          Q66,86 64,86
+          L44,86
+          Q42,86 42,84
+          Z" />
+
+    <!-- ── Recording badge: outer pulse ring (red, 30% alpha) ────── -->
+    <!-- Circle centre (76, 34), r=13 -->
+    <path
+        android:fillColor="#FF1744"
+        android:fillAlpha="0.30"
+        android:pathData="M63,34 a13,13 0 1,0 26,0 a13,13 0 1,0 -26,0 Z" />
+
+    <!-- ── Recording badge: solid circle (red) ──────────────────── -->
+    <!-- Circle centre (76, 34), r=9 -->
+    <path
+        android:fillColor="#FF1744"
+        android:pathData="M67,34 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0 Z" />
+
+    <!-- ── Recording badge: white inner dot ─────────────────────── -->
+    <!-- Circle centre (76, 34), r=4 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M72,34 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0 Z" />
+
+</vector>

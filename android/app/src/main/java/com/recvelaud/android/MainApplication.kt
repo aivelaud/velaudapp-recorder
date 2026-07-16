@@ -1,6 +1,7 @@
 package com.recvelaud.android
 
 import android.app.Application
+import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeHost
@@ -18,16 +19,15 @@ class MainApplication : Application(), ReactApplication {
 
     override val reactNativeHost: ReactNativeHost =
         object : DefaultReactNativeHost(this) {
-            override fun getPackages(): List<ReactPackage> = listOf(
-                // Custom native modules (screen recorder, floating panel, video library)
-                // Third-party packages (screens, safe-area, video, icons, ads, etc.)
-                // are auto-registered via the com.facebook.react.settings autolinking
-                // mechanism and do not need explicit ReactPackage registration in
-                // this React Native 0.74 build configuration.
-                RecorderPackage(),
-                FloatingPanelPackage(),
-                VideoLibraryPackage()
-            )
+            override fun getPackages(): List<ReactPackage> =
+                // PackageList auto-registers all third-party packages via RN autolinking
+                // (react-native-screens, safe-area-context, vector-icons, video, ads, etc.)
+                // Custom native modules are added explicitly on top.
+                PackageList(this@MainApplication).packages + listOf(
+                    RecorderPackage(),
+                    FloatingPanelPackage(),
+                    VideoLibraryPackage()
+                )
 
             override fun getJSMainModuleName(): String = "index"
 
