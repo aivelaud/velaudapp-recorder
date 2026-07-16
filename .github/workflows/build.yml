@@ -37,12 +37,15 @@ jobs:
 
       # ── Patch react-native gradle plugin ──────────────────────────────────
       # 1) Remove foojay-resolver-convention (not available in CI)
-      # 2) Remove serviceOf<ModuleRegistry>() and both its import lines.
-      #    The block is multiline in build.gradle.kts:
-      #      testRuntimeOnly(\n    serviceOf<ModuleRegistry>()\n)
-      #    Without this patch the react-native-gradle-plugin subproject fails
-      #    to compile and com.facebook.react.rootproject is never registered.
-      #    JS patcher is base64-encoded (syntax-verified) to avoid YAML issues.
+      # 2) Remove the entire testRuntimeOnly block containing serviceOf<ModuleRegistry>():
+      #      testRuntimeOnly(
+      #          serviceOf<ModuleRegistry>()
+      #              .getModule(ToolingApiJarProvider::class.java)
+      #              .classpath
+      #      )
+      #    Patcher is paren-depth-aware so it removes all 5 lines safely.
+      #    Also removes both import lines (serviceOf + ModuleRegistry).
+      #    JS patcher is base64-encoded (syntax+logic verified) to avoid YAML issues.
       - name: Patch react-native gradle plugin (CI compat)
         run: |
           # Patch 1 — settings.gradle.kts: remove foojay resolver
@@ -57,7 +60,7 @@ jobs:
           if [ -f "$PLUGIN_BUILD" ]; then
             echo "--- serviceOf/ModuleRegistry lines BEFORE patch ---"
             grep -n 'serviceOf\|ModuleRegistry' "$PLUGIN_BUILD" || echo "(none found)"
-            echo "Y29uc3QgZnMgPSByZXF1aXJlKCdmcycpOwpjb25zdCBmaWxlUGF0aCA9IHByb2Nlc3MuYXJndlsyXTsKbGV0IHNyYyA9IGZzLnJlYWRGaWxlU3luYyhmaWxlUGF0aCwgJ3V0ZjgnKTsKbGV0IG91dCA9IHNyYzsKCm91dCA9IG91dC5yZXBsYWNlKC9bIFx0XSp0ZXN0UnVudGltZU9ubHlcKFxzKlxuWyBcdF0qc2VydmljZU9mPE1vZHVsZVJlZ2lzdHJ5PlwoXClccypcblsgXHRdKlwpWyBcdF0qXHI/XG4/L2csICcnKTsKb3V0ID0gb3V0LnJlcGxhY2UoL1sgXHRdKnRlc3RSdW50aW1lT25seVwoc2VydmljZU9mPE1vZHVsZVJlZ2lzdHJ5PlwoXClcKVsgXHRdKlxyP1xuPy9nLCAnJyk7Cm91dCA9IG91dC5yZXBsYWNlKC9eWyBcdF0qc2VydmljZU9mPE1vZHVsZVJlZ2lzdHJ5PlwoXClbIFx0XSpccj9cbj8vbWcsICcnKTsKb3V0ID0gb3V0LnJlcGxhY2UoL15bIFx0XSppbXBvcnRbXlxuXSpzZXJ2aWNlT2ZbXlxuXSpccj9cbj8vbWcsICcnKTsKb3V0ID0gb3V0LnJlcGxhY2UoL15bIFx0XSppbXBvcnRbXlxuXSpNb2R1bGVSZWdpc3RyeVteXG5dKlxyP1xuPy9tZywgJycpOwpvdXQgPSBvdXQucmVwbGFjZSgvXlsgXHRdKnRlc3RSdW50aW1lT25seVwoXHMqXClbIFx0XSpccj9cbj8vbWcsICcnKTsKCmNvbnN0IGNoYW5nZWQgPSBzcmMgIT09IG91dDsKZnMud3JpdGVGaWxlU3luYyhmaWxlUGF0aCwgb3V0KTsKY29uc29sZS5sb2coJ1BhdGNoIHJlc3VsdDonLCBjaGFuZ2VkID8gJ0NIQU5HRUQgLSBzZXJ2aWNlT2YrTW9kdWxlUmVnaXN0cnkgcmVtb3ZlZCcgOiAnTk8gQ0hBTkdFIC0gcGF0dGVybiBub3QgZm91bmQnKTsKY29uc29sZS5sb2coJ1JlbWFpbmluZyBzZXJ2aWNlT2YvTW9kdWxlUmVnaXN0cnkgbGluZXM6Jyk7Cm91dC5zcGxpdCgnXG4nKS5mb3JFYWNoKGZ1bmN0aW9uKGwsIGkpIHsKICBpZiAoL3NlcnZpY2VPZnxNb2R1bGVSZWdpc3RyeS8udGVzdChsKSkgeyBjb25zb2xlLmxvZygnICBMJyArIChpICsgMSkgKyAnOiAnICsgbCk7IH0KfSk7Cg==" \
+            echo "Y29uc3QgZnMgPSByZXF1aXJlKCdmcycpOwpjb25zdCBmaWxlUGF0aCA9IHByb2Nlc3MuYXJndlsyXTsKY29uc3Qgc3JjID0gZnMucmVhZEZpbGVTeW5jKGZpbGVQYXRoLCAndXRmOCcpOwpjb25zdCBsaW5lcyA9IHNyYy5zcGxpdCgnXG4nKTsKY29uc3QgcmVzdWx0ID0gW107CmxldCBpID0gMDsKbGV0IHJlbW92ZWRCbG9ja3MgPSAwOwpsZXQgcmVtb3ZlZEltcG9ydHMgPSAwOwoKd2hpbGUgKGkgPCBsaW5lcy5sZW5ndGgpIHsKICBjb25zdCBsaW5lID0gbGluZXNbaV07CgogIC8vIERldGVjdCBzdGFydCBvZiBtdWx0aWxpbmUgdGVzdFJ1bnRpbWVPbmx5KCBibG9jayAobm8gY2xvc2luZyBwYXJlbiBvbiBzYW1lIGxpbmUpCiAgaWYgKC9eWyBcdF0qdGVzdFJ1bnRpbWVPbmx5XCgvLnRlc3QobGluZSkgJiYgIS9cKVsgXHRdKiQvLnRlc3QobGluZS5yZXBsYWNlKC9cKC4qXCkvZywgJycpKSkgewogICAgLy8gQ29sbGVjdCBlbnRpcmUgYmxvY2sgYnkgdHJhY2tpbmcgcGFyZW4gZGVwdGgKICAgIGNvbnN0IGJsb2NrTGluZXMgPSBbbGluZV07CiAgICBsZXQgZGVwdGggPSAwOwogICAgZm9yIChjb25zdCBjIG9mIGxpbmUpIHsgaWYgKGMgPT09ICcoJykgZGVwdGgrKzsgZWxzZSBpZiAoYyA9PT0gJyknKSBkZXB0aC0tOyB9CiAgICBpKys7CiAgICB3aGlsZSAoaSA8IGxpbmVzLmxlbmd0aCAmJiBkZXB0aCA+IDApIHsKICAgICAgY29uc3QgbCA9IGxpbmVzW2ldOwogICAgICBmb3IgKGNvbnN0IGMgb2YgbCkgeyBpZiAoYyA9PT0gJygnKSBkZXB0aCsrOyBlbHNlIGlmIChjID09PSAnKScpIGRlcHRoLS07IH0KICAgICAgYmxvY2tMaW5lcy5wdXNoKGwpOwogICAgICBpKys7CiAgICB9CiAgICBjb25zdCBibG9ja1N0ciA9IGJsb2NrTGluZXMuam9pbignXG4nKTsKICAgIGlmIChibG9ja1N0ci5pbmNsdWRlcygnc2VydmljZU9mJykgfHwgYmxvY2tTdHIuaW5jbHVkZXMoJ01vZHVsZVJlZ2lzdHJ5JykpIHsKICAgICAgcmVtb3ZlZEJsb2NrcysrOwogICAgICBjb25zb2xlLmxvZygnUmVtb3ZlZCB0ZXN0UnVudGltZU9ubHkgYmxvY2sgKCcgKyBibG9ja0xpbmVzLmxlbmd0aCArICcgbGluZXMpOicpOwogICAgICBibG9ja0xpbmVzLmZvckVhY2goZnVuY3Rpb24obCkgeyBjb25zb2xlLmxvZygnICAnICsgbCk7IH0pOwogICAgfSBlbHNlIHsKICAgICAgcmVzdWx0LnB1c2guYXBwbHkocmVzdWx0LCBibG9ja0xpbmVzKTsKICAgIH0KICAgIGNvbnRpbnVlOwogIH0KCiAgLy8gRGV0ZWN0IHNpbmdsZS1saW5lIHRlc3RSdW50aW1lT25seShzZXJ2aWNlT2Y8TW9kdWxlUmVnaXN0cnk+KCkuLi4pCiAgaWYgKC9bIFx0XSp0ZXN0UnVudGltZU9ubHlcKC4qc2VydmljZU9mLipcKS8udGVzdChsaW5lKSkgewogICAgcmVtb3ZlZEJsb2NrcysrOwogICAgY29uc29sZS5sb2coJ1JlbW92ZWQgc2luZ2xlLWxpbmUgdGVzdFJ1bnRpbWVPbmx5IGJsb2NrOiAnICsgbGluZS50cmltKCkpOwogICAgaSsrOwogICAgY29udGludWU7CiAgfQoKICAvLyBSZW1vdmUgaW1wb3J0IGxpbmVzIGZvciBzZXJ2aWNlT2Ygb3IgTW9kdWxlUmVnaXN0cnkKICBpZiAoL15bIFx0XSppbXBvcnRbXlxuXSooc2VydmljZU9mfE1vZHVsZVJlZ2lzdHJ5KS8udGVzdChsaW5lKSkgewogICAgcmVtb3ZlZEltcG9ydHMrKzsKICAgIGNvbnNvbGUubG9nKCdSZW1vdmVkIGltcG9ydDogJyArIGxpbmUudHJpbSgpKTsKICAgIGkrKzsKICAgIGNvbnRpbnVlOwogIH0KCiAgcmVzdWx0LnB1c2gobGluZSk7CiAgaSsrOwp9Cgpjb25zdCBvdXQgPSByZXN1bHQuam9pbignXG4nKTsKY29uc3QgY2hhbmdlZCA9IHNyYyAhPT0gb3V0Owpmcy53cml0ZUZpbGVTeW5jKGZpbGVQYXRoLCBvdXQpOwpjb25zb2xlLmxvZygnUGF0Y2ggcmVzdWx0OicsIGNoYW5nZWQgPyAnQ0hBTkdFRCcgOiAnTk8gQ0hBTkdFJyk7CmNvbnNvbGUubG9nKCdSZW1vdmVkIGJsb2NrczonLCByZW1vdmVkQmxvY2tzLCAnfCBSZW1vdmVkIGltcG9ydHM6JywgcmVtb3ZlZEltcG9ydHMpOwpjb25zb2xlLmxvZygnUmVtYWluaW5nIHNlcnZpY2VPZi9Nb2R1bGVSZWdpc3RyeSBsaW5lczonKTsKcmVzdWx0LmZvckVhY2goZnVuY3Rpb24obCwgaWR4KSB7CiAgaWYgKC9zZXJ2aWNlT2Z8TW9kdWxlUmVnaXN0cnkvLnRlc3QobCkpIHsgY29uc29sZS5sb2coJyAgTCcgKyAoaWR4ICsgMSkgKyAnOiAnICsgbCk7IH0KfSk7Cg==" \
               | base64 -d > /tmp/patch_rn.js
             node /tmp/patch_rn.js "$PLUGIN_BUILD"
             echo "--- serviceOf/ModuleRegistry lines AFTER patch ---"
