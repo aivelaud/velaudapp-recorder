@@ -35,29 +35,24 @@ jobs:
       - name: Install npm dependencies
         run: npm install --legacy-peer-deps
 
+      # ── Setup Gradle (handles wrapper download automatically) ────
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.6"
+
       # ── Gradle wrapper permissions ────────────────────────────
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      # ── Download gradle-wrapper.jar if missing ─────────────────
-      - name: Download gradle-wrapper.jar
+      # ── Generate gradle-wrapper.jar using installed Gradle ────
+      - name: Generate gradle-wrapper.jar
+        working-directory: android
         run: |
-          WRAPPER_JAR="android/gradle/wrapper/gradle-wrapper.jar"
-          if [ ! -f "$WRAPPER_JAR" ]; then
-            echo "Downloading gradle-wrapper.jar..."
-            curl -fL "https://github.com/nicowillis/gradle-wrapper-jars/raw/main/gradle-wrapper.jar" \
-              -o "$WRAPPER_JAR" 2>/dev/null || \
-            curl -fL "https://raw.githubusercontent.com/gradle/gradle/v8.6.0/gradle/wrapper/gradle-wrapper.jar" \
-              -o "$WRAPPER_JAR" 2>/dev/null || \
-            (
-              # Fallback: create a minimal bootstrapper
-              echo "Using gradle install fallback"
-              mkdir -p "$HOME/.gradle/wrapper/dists"
-              curl -fL "https://services.gradle.org/distributions/gradle-8.6-bin.zip" \
-                -o /tmp/gradle.zip
-              unzip -q /tmp/gradle.zip -d "$HOME/.gradle/wrapper/dists/"
-            )
-          fi
+          # Use the gradle installed by setup-gradle to regenerate wrapper
+          gradle wrapper --gradle-version 8.6 --distribution-type bin
+          chmod +x gradlew
+          ls -la gradle/wrapper/
 
       # ── Setup Android SDK ─────────────────────────────────────
       - name: Setup Android SDK
