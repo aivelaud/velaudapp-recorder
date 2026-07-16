@@ -1,0 +1,243 @@
+name: Android Build & Release
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build APK & AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Java 17 ───────────────────────────────────────────────
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      # ── Node 20 ───────────────────────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # ── Install JS dependencies ────────────────────────────────
+      - name: Install npm dependencies
+        run: npm install --legacy-peer-deps
+
+      # ── Gradle wrapper permissions ────────────────────────────
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      # ── Download gradle-wrapper.jar if missing ─────────────────
+      - name: Download gradle-wrapper.jar
+        run: |
+          WRAPPER_JAR="android/gradle/wrapper/gradle-wrapper.jar"
+          if [ ! -f "$WRAPPER_JAR" ]; then
+            echo "Downloading gradle-wrapper.jar..."
+            curl -fL "https://github.com/nicowillis/gradle-wrapper-jars/raw/main/gradle-wrapper.jar" \
+              -o "$WRAPPER_JAR" 2>/dev/null || \
+            curl -fL "https://raw.githubusercontent.com/gradle/gradle/v8.6.0/gradle/wrapper/gradle-wrapper.jar" \
+              -o "$WRAPPER_JAR" 2>/dev/null || \
+            (
+              # Fallback: create a minimal bootstrapper
+              echo "Using gradle install fallback"
+              mkdir -p "$HOME/.gradle/wrapper/dists"
+              curl -fL "https://services.gradle.org/distributions/gradle-8.6-bin.zip" \
+                -o /tmp/gradle.zip
+              unzip -q /tmp/gradle.zip -d "$HOME/.gradle/wrapper/dists/"
+            )
+          fi
+
+      # ── Setup Android SDK ─────────────────────────────────────
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # ── Accept SDK licenses ───────────────────────────────────
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses || true
+
+      # ── Generate debug keystore ───────────────────────────────
+      - name: Generate debug keystore
+        run: |
+          keytool -genkey -v \
+            -keystore android/app/debug.keystore \
+            -alias androiddebugkey \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass android \
+            -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      # ── ADIM A: assembleRelease (Gradle ABI/density splits) ────
+      - name: Build Release APKs (Gradle ABI splits — ADIM A)
+        working-directory: android
+        run: |
+          ./gradlew assembleRelease \
+            --stacktrace \
+            --no-daemon \
+            -Porg.gradle.jvmargs="-Xmx4g"
+
+      # ── ADIM A: assembleDebug (universal debug APK) ───────────
+      - name: Build Debug APK
+        working-directory: android
+        run: |
+          ./gradlew assembleDebug \
+            --no-daemon \
+            -Porg.gradle.jvmargs="-Xmx4g"
+
+      # ── ADIM B Step 1: bundleRelease (.aab) ───────────────────
+      - name: Build Release AAB (ADIM B — Step 1)
+        working-directory: android
+        run: |
+          ./gradlew bundleRelease \
+            --stacktrace \
+            --no-daemon \
+            -Porg.gradle.jvmargs="-Xmx4g"
+
+      # ── ADIM B Step 2: Verify .aab exists ─────────────────────
+      - name: Verify AAB exists
+        run: |
+          AAB=$(find android/app/build/outputs/bundle -name "*.aab" | head -1)
+          if [ -z "$AAB" ]; then
+            echo "ERROR: .aab file not found!"
+            exit 1
+          fi
+          echo "AAB_PATH=$AAB" >> $GITHUB_ENV
+          echo "Found AAB: $AAB"
+          ls -lh "$AAB"
+
+      # ── ADIM B Step 3: Install bundletool ─────────────────────
+      - name: Install bundletool
+        run: |
+          BUNDLETOOL_VERSION="1.15.6"
+          curl -fL "https://github.com/google/bundletool/releases/download/${BUNDLETOOL_VERSION}/bundletool-all-${BUNDLETOOL_VERSION}.jar" \
+            -o /usr/local/bin/bundletool.jar
+          echo '#!/bin/sh
+          exec java -jar /usr/local/bin/bundletool.jar "$@"' > /usr/local/bin/bundletool
+          chmod +x /usr/local/bin/bundletool
+          bundletool version
+
+      # ── ADIM B Step 4: Universal APK from AAB ─────────────────
+      - name: Build universal APK from AAB (ADIM B — universal)
+        run: |
+          bundletool build-apks \
+            --bundle="${{ env.AAB_PATH }}" \
+            --output=android/app/build/outputs/app-release-universal.apks \
+            --mode=universal \
+            --ks=android/app/debug.keystore \
+            --ks-pass=pass:android \
+            --ks-key-alias=androiddebugkey \
+            --key-pass=pass:android
+          # Extract base.apk from universal
+          cd android/app/build/outputs
+          unzip -o app-release-universal.apks -d universal-extracted/
+          ls -lh universal-extracted/
+
+      # ── ADIM B Step 5: Split APKs from AAB ────────────────────
+      - name: Build split APKs from AAB (ADIM B — splits)
+        run: |
+          bundletool build-apks \
+            --bundle="${{ env.AAB_PATH }}" \
+            --output=android/app/build/outputs/app-release-splits.apks \
+            --ks=android/app/debug.keystore \
+            --ks-pass=pass:android \
+            --ks-key-alias=androiddebugkey \
+            --key-pass=pass:android
+          # Extract split APKs
+          mkdir -p android/app/build/outputs/splits-extracted
+          cd android/app/build/outputs
+          unzip -o app-release-splits.apks -d splits-extracted/
+          echo "=== Split APKs produced ==="
+          ls -lh splits-extracted/
+
+      # ── List all build outputs ─────────────────────────────────
+      - name: List all build outputs
+        run: |
+          echo "=== ADIM A: Gradle ABI splits (assembleRelease) ==="
+          find android/app/build/outputs/apk/release -name "*.apk" -exec ls -lh {} \;
+          echo ""
+          echo "=== Debug APK (assembleDebug) ==="
+          find android/app/build/outputs/apk/debug -name "*.apk" -exec ls -lh {} \;
+          echo ""
+          echo "=== ADIM B: AAB file ==="
+          ls -lh "${{ env.AAB_PATH }}"
+          echo ""
+          echo "=== ADIM B: Universal APK (base.apk) ==="
+          ls -lh android/app/build/outputs/universal-extracted/ 2>/dev/null || true
+          echo ""
+          echo "=== ADIM B: Split APKs ==="
+          ls -lh android/app/build/outputs/splits-extracted/ 2>/dev/null || true
+
+      # ── Upload ADIM A: Gradle release APKs ────────────────────
+      - name: Upload ADIM-A Release APKs (Gradle splits)
+        uses: actions/upload-artifact@v4
+        with:
+          name: adim-a-release-apks-gradle-splits
+          path: android/app/build/outputs/apk/release/*.apk
+          retention-days: 14
+
+      # ── Upload Debug APK ───────────────────────────────────────
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk-universal
+          path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 14
+
+      # ── Upload ADIM B: AAB ─────────────────────────────────────
+      - name: Upload ADIM-B AAB file
+        uses: actions/upload-artifact@v4
+        with:
+          name: adim-b-release-aab
+          path: ${{ env.AAB_PATH }}
+          retention-days: 14
+
+      # ── Upload ADIM B: base.apk (universal) ───────────────────
+      - name: Upload ADIM-B Universal base.apk
+        uses: actions/upload-artifact@v4
+        with:
+          name: adim-b-universal-base-apk
+          path: android/app/build/outputs/universal-extracted/
+          retention-days: 14
+
+      # ── Upload ADIM B: split_config APKs ──────────────────────
+      - name: Upload ADIM-B Split Config APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: adim-b-split-config-apks
+          path: android/app/build/outputs/splits-extracted/
+          retention-days: 14
+
+      # ── Summary ───────────────────────────────────────────────
+      - name: Build Summary
+        run: |
+          echo "## ✅ Velaud Recorder Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ADIM A — Gradle ABI/density splits" >> $GITHUB_STEP_SUMMARY
+          find android/app/build/outputs/apk/release -name "*.apk" | while read f; do
+            SIZE=$(du -h "$f" | cut -f1)
+            echo "- \`$(basename $f)\` — $SIZE" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ADIM B — AAB + bundletool splits" >> $GITHUB_STEP_SUMMARY
+          echo "- \`$(basename ${{ env.AAB_PATH }})\` — $(du -h ${{ env.AAB_PATH }} | cut -f1)" >> $GITHUB_STEP_SUMMARY
+          echo "- Split APKs: base.apk + split_config.*.apk (ABI, dil, density)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Debug APK" >> $GITHUB_STEP_SUMMARY
+          find android/app/build/outputs/apk/debug -name "*.apk" | while read f; do
+            SIZE=$(du -h "$f" | cut -f1)
+            echo "- \`$(basename $f)\` — $SIZE" >> $GITHUB_STEP_SUMMARY
+          done
