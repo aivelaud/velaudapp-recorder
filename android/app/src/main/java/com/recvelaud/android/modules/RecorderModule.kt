@@ -34,14 +34,18 @@ class RecorderModule(private val reactContext: ReactApplicationContext) :
         ScreenRecordService.reactContext = reactContext
     }
 
-    private val activityResultListener = BaseActivityEventListener { requestCode, resultCode, data ->
-        if (requestCode == REQUEST_MEDIA_PROJECTION) {
-            val promise = pendingPromise ?: return@BaseActivityEventListener
-            pendingPromise = null
-            if (resultCode == Activity.RESULT_OK && data != null) {
-                startRecordingService(resultCode, data, pendingConfig, promise)
-            } else {
-                promise.resolve(false)
+    // BaseActivityEventListener is an abstract class, not a SAM interface — must use
+    // object expression (lambda syntax causes "Too many arguments for constructor" error).
+    private val activityResultListener = object : BaseActivityEventListener() {
+        override fun onActivityResult(activity: Activity?, requestCode: Int, resultCode: Int, data: Intent?) {
+            if (requestCode == REQUEST_MEDIA_PROJECTION) {
+                val promise = pendingPromise ?: return
+                pendingPromise = null
+                if (resultCode == Activity.RESULT_OK && data != null) {
+                    startRecordingService(resultCode, data, pendingConfig, promise)
+                } else {
+                    promise.resolve(false)
+                }
             }
         }
     }

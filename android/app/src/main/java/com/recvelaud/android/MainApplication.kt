@@ -1,7 +1,6 @@
 package com.recvelaud.android
 
 import android.app.Application
-import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeHost
@@ -19,20 +18,23 @@ class MainApplication : Application(), ReactApplication {
 
     override val reactNativeHost: ReactNativeHost =
         object : DefaultReactNativeHost(this) {
-            override fun getPackages(): List<ReactPackage> {
-                val packages = PackageList(this).packages.toMutableList()
-                // Add our custom native packages
-                packages.add(RecorderPackage())
-                packages.add(FloatingPanelPackage())
-                packages.add(VideoLibraryPackage())
-                return packages
-            }
+            override fun getPackages(): List<ReactPackage> = listOf(
+                // Custom native modules — autolinked PackageList removed because
+                // com.facebook.react plugin's generatePackageList task does not
+                // register its output as a Kotlin source directory in AGP 8.x.
+                // Add any third-party ReactPackage instances here explicitly if
+                // their JS-side APIs are needed at runtime.
+                RecorderPackage(),
+                FloatingPanelPackage(),
+                VideoLibraryPackage()
+            )
 
             override fun getJSMainModuleName(): String = "index"
 
             override fun getUseDeveloperSupport(): Boolean = BuildConfig.DEBUG
 
-            override val isNewArchEnabled: Boolean = fabricEnabled
+            // fabricEnabled was removed in RN 0.74; use BuildConfig fields instead.
+            override val isNewArchEnabled: Boolean = BuildConfig.IS_NEW_ARCHITECTURE_ENABLED
             override val isHermesEnabled: Boolean = true
         }
 
