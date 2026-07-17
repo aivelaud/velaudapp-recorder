@@ -62,5 +62,13 @@
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
 
+        <!-- Crash reporter — launched by global UncaughtExceptionHandler -->
+        <activity
+            android:name=".CrashActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.NoTitleBar"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true" />
+
     </application>
 </manifest>

@@ -274,13 +274,18 @@ class ScreenRecordService : Service() {
         val ctx = reactContext ?: return
         handler.post {
             try {
+                // Must use WritableNativeMap (not a plain Kotlin Map) — the RN bridge
+                // only knows how to serialise ReadableMap/WritableMap implementations
+                // to JavaScript; passing a raw kotlin.collections.Map causes a
+                // ClassCastException inside the bridge serialiser.
+                val payload = com.facebook.react.bridge.Arguments.createMap().apply {
+                    putBoolean("isRecording", isRecording)
+                    putBoolean("isPaused", isPaused)
+                    putDouble("duration", getDurationMs().toDouble())
+                    putString("filePath", outputFilePath ?: "")
+                }
                 ctx.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-                    .emit("RecordingStatus", mapOf(
-                        "isRecording" to isRecording,
-                        "isPaused" to isPaused,
-                        "duration" to getDurationMs(),
-                        "filePath" to (outputFilePath ?: "")
-                    ))
+                    .emit("RecordingStatus", payload)
             } catch (_: Exception) {}
         }
     }

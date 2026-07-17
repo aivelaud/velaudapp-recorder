@@ -246,6 +246,9 @@ export default function HomeScreen() {
         <Text style={styles.adText}>Reklam</Text>
         {/* AdMob BannerAd goes here */}
       </View>
+
+      {/* Build info — small, unobtrusive, helps identify which APK is installed */}
+      <Text style={styles.buildInfo}>v1.0.1 (build 2)</Text>
     </SafeAreaView>
   );
 }
@@ -421,5 +424,12 @@ const styles = StyleSheet.create({
   adText: {
     color: Colors.textMuted,
     fontSize: 12,
+  },
+  buildInfo: {
+    color: Colors.textMuted,
+    fontSize: 10,
+    textAlign: 'center',
+    paddingBottom: 4,
+    opacity: 0.5,
   },
 });
