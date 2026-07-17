@@ -1,6 +1,7 @@
 package com.recvelaud.android
 
 import android.app.Application
+import android.util.Log
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
@@ -46,6 +47,12 @@ class MainApplication : Application(), ReactApplication {
         if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
             load()
         }
-        MobileAds.initialize(this) {}
+        // Initialize AdMob SDK. Wrapped in try-catch so that any AdMob
+        // initialisation failure does not crash the whole app at startup.
+        try {
+            MobileAds.initialize(this) {}
+        } catch (e: Exception) {
+            Log.e("MainApplication", "MobileAds.initialize failed: ${e.message}", e)
+        }
     }
 }

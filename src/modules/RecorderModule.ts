@@ -23,10 +23,19 @@ class RecorderModuleClass {
   private emitter: NativeEventEmitter;
 
   constructor() {
+    // NativeEventEmitter() without a module arg throws in RN 0.73+.
+    // Always pass the module if available; fall back to a bare emitter only
+    // when definitely unavailable (non-Android or module missing).
     if (ScreenRecorderModule) {
       this.emitter = new NativeEventEmitter(ScreenRecorderModule);
     } else {
-      this.emitter = new NativeEventEmitter();
+      // Safe no-op emitter — subscription methods still work, they just
+      // never fire. This prevents a hard crash in non-Android environments.
+      this.emitter = {
+        addListener: (_event: string, _handler: (...args: any[]) => any) => ({
+          remove: () => {},
+        }),
+      } as unknown as NativeEventEmitter;
     }
   }
 
