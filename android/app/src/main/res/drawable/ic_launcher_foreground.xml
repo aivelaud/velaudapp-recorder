@@ -2,7 +2,11 @@
 <!--
   Adaptive icon foreground — Velaud Recorder
   Canvas: 108×108 dp  |  Safe zone: 18–90 dp on each axis (72×72 centre)
-  Design: White laptop-screen silhouette + red recording badge (top-right corner)
+  Design:
+    • White circular arrow  — 300° CW arc (gap at ~12→1 o'clock)
+      Arc centre (54,54), r=28; stroke 6dp round-caps
+      Filled arrowhead triangle at end-of-arc (≈1 o'clock, pointing CW)
+    • White video-camera icon centred inside the arc
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -10,68 +14,68 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- ── Monitor outer frame (white rounded rect) ─────────────── -->
+    <!-- ═══════════════════════════════════════════════════════════
+         CIRCULAR ARROW ARC
+         Centre (54,54), r=28
+         Start: 12 o'clock (54, 26) — angle 90° from right
+         End:   ~1 o'clock  (78, 40) — angle 30° from right
+         300° clockwise (large-arc=1, sweep=1)
+         ═══════════════════════════════════════════════════════════ -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:pathData="M 54,26 A 28,28 0 1 1 78,40" />
+
+    <!-- ═══════════════════════════════════════════════════════════
+         ARROWHEAD — filled white triangle at end of arc (78,40)
+         CW tangent at 30°: direction (sin30°, cos30°) = (0.5, 0.866)
+         Tip at (78,40); base ~10dp back, half-width ~5dp
+         ═══════════════════════════════════════════════════════════ -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 78,40 L 69,34 L 77,29 Z" />
+
+    <!-- ═══════════════════════════════════════════════════════════
+         VIDEO CAMERA BODY
+         28×18 dp, centred at (54,56), corners r=2
+         ═══════════════════════════════════════════════════════════ -->
     <path
         android:fillColor="#FFFFFF"
         android:pathData="
-          M25,31
-          Q25,26 30,26
-          L78,26
-          Q83,26 83,31
-          L83,70
-          Q83,75 78,75
-          L30,75
-          Q25,75 25,70
+          M40,49
+          Q40,47 42,47
+          L66,47
+          Q68,47 68,49
+          L68,63
+          Q68,65 66,65
+          L42,65
+          Q40,65 40,63
           Z" />
 
-    <!-- ── Screen display area (dark fill = brand background) ───── -->
-    <path
-        android:fillColor="#0F0F0F"
-        android:pathData="M30,32 L78,32 L78,69 L30,69 Z" />
-
-    <!-- ── Play / Video indicator on screen (white, 75% alpha) ──── -->
-    <!-- Triangle: left-edge 43, right-tip 62, vertical centre 50.5 -->
+    <!-- ═══════════════════════════════════════════════════════════
+         VIEWFINDER NOTCH — top bump of camera body
+         14dp wide, 4dp tall, centred horizontally
+         ═══════════════════════════════════════════════════════════ -->
     <path
         android:fillColor="#FFFFFF"
-        android:fillAlpha="0.75"
-        android:pathData="M43,42 L43,59 L62,50.5 Z" />
+        android:pathData="M48,47 L48,43 Q48,41 50,41 L58,41 Q60,41 60,43 L60,47 Z" />
 
-    <!-- ── Monitor neck ──────────────────────────────────────────── -->
+    <!-- ═══════════════════════════════════════════════════════════
+         CAMERA LENS — circle, centre (54,56) r=6
+         Drawn as two 180° arcs (Android vector arc trick)
+         ═══════════════════════════════════════════════════════════ -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M50,75 L58,75 L61,84 L47,84 Z" />
+        android:fillAlpha="0.0"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="0"
+        android:pathData="M48,56 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
 
-    <!-- ── Monitor base ──────────────────────────────────────────── -->
+    <!-- Solid lens filled — override with fill-only path -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="
-          M42,82
-          Q42,80 44,80
-          L64,80
-          Q66,80 66,82
-          L66,84
-          Q66,86 64,86
-          L44,86
-          Q42,86 42,84
-          Z" />
-
-    <!-- ── Recording badge: outer pulse ring (red, 30% alpha) ────── -->
-    <!-- Circle centre (76, 34), r=13 -->
-    <path
-        android:fillColor="#FF1744"
-        android:fillAlpha="0.30"
-        android:pathData="M63,34 a13,13 0 1,0 26,0 a13,13 0 1,0 -26,0 Z" />
-
-    <!-- ── Recording badge: solid circle (red) ──────────────────── -->
-    <!-- Circle centre (76, 34), r=9 -->
-    <path
-        android:fillColor="#FF1744"
-        android:pathData="M67,34 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0 Z" />
-
-    <!-- ── Recording badge: white inner dot ─────────────────────── -->
-    <!-- Circle centre (76, 34), r=4 -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M72,34 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0 Z" />
+        android:fillColor="#F44336"
+        android:pathData="M48,56 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
 
 </vector>
