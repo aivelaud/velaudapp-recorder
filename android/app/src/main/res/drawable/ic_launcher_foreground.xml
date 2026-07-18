@@ -1,12 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Adaptive icon foreground — Velaud Recorder
-  Canvas: 108×108 dp  |  Safe zone: 18–90 dp on each axis (72×72 centre)
-  Design:
-    • White circular arrow  — 300° CW arc (gap at ~12→1 o'clock)
-      Arc centre (54,54), r=28; stroke 6dp round-caps
-      Filled arrowhead triangle at end-of-arc (≈1 o'clock, pointing CW)
-    • White video-camera icon centred inside the arc
+  Adaptive icon foreground — Velaud Recorder v1.0.3
+  Bold white V letter — centred within 108×108 canvas
+  Safe zone (72×72 centre block): V fits within 18–90 dp range
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -14,68 +10,13 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- ═══════════════════════════════════════════════════════════
-         CIRCULAR ARROW ARC
-         Centre (54,54), r=28
-         Start: 12 o'clock (54, 26) — angle 90° from right
-         End:   ~1 o'clock  (78, 40) — angle 30° from right
-         300° clockwise (large-arc=1, sweep=1)
-         ═══════════════════════════════════════════════════════════ -->
+    <!-- Bold white V — stroke with round caps to match brand logo -->
     <path
         android:fillColor="@android:color/transparent"
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="6"
+        android:strokeWidth="10"
         android:strokeLineCap="round"
-        android:pathData="M 54,26 A 28,28 0 1 1 78,40" />
-
-    <!-- ═══════════════════════════════════════════════════════════
-         ARROWHEAD — filled white triangle at end of arc (78,40)
-         CW tangent at 30°: direction (sin30°, cos30°) = (0.5, 0.866)
-         Tip at (78,40); base ~10dp back, half-width ~5dp
-         ═══════════════════════════════════════════════════════════ -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M 78,40 L 69,34 L 77,29 Z" />
-
-    <!-- ═══════════════════════════════════════════════════════════
-         VIDEO CAMERA BODY
-         28×18 dp, centred at (54,56), corners r=2
-         ═══════════════════════════════════════════════════════════ -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="
-          M40,49
-          Q40,47 42,47
-          L66,47
-          Q68,47 68,49
-          L68,63
-          Q68,65 66,65
-          L42,65
-          Q40,65 40,63
-          Z" />
-
-    <!-- ═══════════════════════════════════════════════════════════
-         VIEWFINDER NOTCH — top bump of camera body
-         14dp wide, 4dp tall, centred horizontally
-         ═══════════════════════════════════════════════════════════ -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M48,47 L48,43 Q48,41 50,41 L58,41 Q60,41 60,43 L60,47 Z" />
-
-    <!-- ═══════════════════════════════════════════════════════════
-         CAMERA LENS — circle, centre (54,56) r=6
-         Drawn as two 180° arcs (Android vector arc trick)
-         ═══════════════════════════════════════════════════════════ -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="0.0"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="0"
-        android:pathData="M48,56 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
-
-    <!-- Solid lens filled — override with fill-only path -->
-    <path
-        android:fillColor="#F44336"
-        android:pathData="M48,56 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
+        android:strokeLineJoin="round"
+        android:pathData="M 22,22 L 54,84 L 86,22" />
 
 </vector>
