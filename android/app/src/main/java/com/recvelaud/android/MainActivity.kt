@@ -11,7 +11,7 @@ class MainActivity : ReactActivity() {
     override fun getMainComponentName(): String = "VelaudRecorder"
 
     override fun createReactActivityDelegate(): ReactActivityDelegate =
-        DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
+        DefaultReactActivityDelegate(this, mainComponentName, false)  // New Arch kapalı
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(null)

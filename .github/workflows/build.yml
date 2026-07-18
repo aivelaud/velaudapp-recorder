@@ -12,9 +12,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
-      contents: write   # GitHub Release oluşturmak için gerekli
+      contents: write   # Artifact temizliği için
 
     steps:
+      # ── Eski artifact'ları sil (storage kotası açmak için) ────────
+      - name: Delete old artifacts
+        run: |
+          echo "Eski artifact'lar siliniyor..."
+          ARTIFACTS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts?per_page=100" \
+            | python3 -c "import sys,json; arts=json.load(sys.stdin)['artifacts']; [print(a['id']) for a in arts]" 2>/dev/null || true)
+
+          for id in $ARTIFACTS; do
+            curl -s -X DELETE \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$id" || true
+            echo "Silindi: artifact $id"
+          done
+          echo "Temizlik tamamlandı."
+
       # ── Checkout ──────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -38,38 +54,27 @@ jobs:
         run: npm install --legacy-peer-deps
 
       # ── Patch react-native gradle plugin ──────────────────────────────────
-      # 1) Remove foojay-resolver-convention (not available in CI)
-      # 2) Remove the entire testRuntimeOnly block containing serviceOf<ModuleRegistry>():
-      #    JS patcher is base64-encoded (syntax+logic verified) to avoid YAML issues.
       - name: Patch react-native gradle plugin (CI compat)
         run: |
-          # Patch 1 — settings.gradle.kts: remove foojay resolver
           SETTINGS="node_modules/@react-native/gradle-plugin/settings.gradle.kts"
           if [ -f "$SETTINGS" ]; then
             sed -i '/foojay-resolver-convention/d' "$SETTINGS"
-            echo "Patched settings.gradle.kts: removed foojay-resolver-convention"
+            echo "Patched settings.gradle.kts"
           fi
 
-          # Patch 2 — react-native-gradle-plugin/build.gradle.kts
           PLUGIN_BUILD="node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/build.gradle.kts"
           if [ -f "$PLUGIN_BUILD" ]; then
-            echo "--- serviceOf/ModuleRegistry lines BEFORE patch ---"
-            grep -n 'serviceOf\|ModuleRegistry' "$PLUGIN_BUILD" || echo "(none found)"
-            echo "Y29uc3QgZnMgPSByZXF1aXJlKCdmcycpOwpjb25zdCBmaWxlUGF0aCA9IHByb2Nlc3MuYXJndlsyXTsKY29uc3Qgc3JjID0gZnMucmVhZEZpbGVTeW5jKGZpbGVQYXRoLCAndXRmOCcpOwpjb25zdCBsaW5lcyA9IHNyYy5zcGxpdCgnXG4nKTsKY29uc3QgcmVzdWx0ID0gW107CmxldCBpID0gMDsKbGV0IHJlbW92ZWRCbG9ja3MgPSAwOwpsZXQgcmVtb3ZlZEltcG9ydHMgPSAwOwp3aGlsZSAoaSA8IGxpbmVzLmxlbmd0aCkgewogIGNvbnN0IGxpbmUgPSBsaW5lc1tpXTsKICBpZiAoL15bIFx0XSp0ZXN0UnVudGltZU9ubHlcKC8udGVzdChsaW5lKSAmJiAhL1wpWyBcdF0qJC8udGVzdChsaW5lLnJlcGxhY2UoL1woLipcKS9nLCAnJykpKSB7CiAgICBjb25zdCBibG9ja0xpbmVzID0gW2xpbmVdOwogICAgbGV0IGRlcHRoID0gMDsKICAgIGZvciAoY29uc3QgYyBvZiBsaW5lKSB7IGlmIChjID09PSAnKCcpIGRlcHRoKys7IGVsc2UgaWYgKGMgPT09ICcpJykgZGVwdGgtLTsgfQogICAgaSsrOwogICAgd2hpbGUgKGkgPCBsaW5lcy5sZW5ndGggJiYgZGVwdGggPiAwKSB7CiAgICAgIGNvbnN0IGwgPSBsaW5lc1tpXTsKICAgICAgZm9yIChjb25zdCBjIG9mIGwpIHsgaWYgKGMgPT09ICcoJykgZGVwdGgrKzsgZWxzZSBpZiAoYyA9PT0gJyknKSBkZXB0aC0tOyB9CiAgICAgIGJsb2NrTGluZXMucHVzaChsKTsKICAgICAgaSsrOwogICAgfQogICAgY29uc3QgYmxvY2tTdHIgPSBibG9ja0xpbmVzLmpvaW4oJ1xuJyk7CiAgICBpZiAoYmxvY2tTdHIuaW5jbHVkZXMoJ3NlcnZpY2VPZicpIHx8IGJsb2NrU3RyLmluY2x1ZGVzKCdNb2R1bGVSZWdpc3RyeScpKSB7CiAgICAgIHJlbW92ZWRCbG9ja3MrKzsKICAgIH0gZWxzZSB7CiAgICAgIHJlc3VsdC5wdXNoLmFwcGx5KHJlc3VsdCwgYmxvY2tMaW5lcyk7CiAgICB9CiAgICBjb250aW51ZTsKICB9CiAgaWYgKC9bIFx0XSp0ZXN0UnVudGltZU9ubHlcKC4qc2VydmljZU9mLipcKS8udGVzdChsaW5lKSkgewogICAgcmVtb3ZlZEJsb2NrcysrOwogICAgaSsrOwogICAgY29udGludWU7CiAgfQogIGlmICgvXlsgXHRdKmltcG9ydFteXG5dKihzZXJ2aWNlT2Z8TW9kdWxlUmVnaXN0cnkpLy50ZXN0KGxpbmUpKSB7CiAgICByZW1vdmVkSW1wb3J0cysrOwogICAgaSsrOwogICAgY29udGludWU7CiAgfQogIHJlc3VsdC5wdXNoKGxpbmUpOwogIGkrKzsKfQpjb25zdCBvdXQgPSByZXN1bHQuam9pbignXG4nKTsKZnMud3JpdGVGaWxlU3luYyhmaWxlUGF0aCwgb3V0KTsKY29uc29sZS5sb2coJ1BhdGNoIHJlc3VsdDogUmVtb3ZlZCBibG9ja3M6JywgcmVtb3ZlZEJsb2NrcywgJ3wgUmVtb3ZlZCBpbXBvcnRzOicsIHJlbW92ZWRJbXBvcnRzKTsK" \
+            echo "Y29uc3QgZnMgPSByZXF1aXJlKCdmcycpOwpjb25zdCBmaWxlUGF0aCA9IHByb2Nlc3MuYXJndlsyXTsKY29uc3Qgc3JjID0gZnMucmVhZEZpbGVTeW5jKGZpbGVQYXRoLCAndXRmOCcpOwpjb25zdCBsaW5lcyA9IHNyYy5zcGxpdCgnXG4nKTsKY29uc3QgcmVzdWx0ID0gW107CmxldCBpID0gMDsKbGV0IHJlbW92ZWRCbG9ja3MgPSAwOwpsZXQgcmVtb3ZlZEltcG9ydHMgPSAwOwp3aGlsZSAoaSA8IGxpbmVzLmxlbmd0aCkgewogIGNvbnN0IGxpbmUgPSBsaW5lc1tpXTsKICBpZiAoL15bIFx0XSp0ZXN0UnVudGltZU9ubHlcKC8udGVzdChsaW5lKSAmJiAhL1wpWyBcdF0qJC8udGVzdChsaW5lLnJlcGxhY2UoL1woLipcKS9nLCAnJykpKSB7CiAgICBjb25zdCBibG9ja0xpbmVzID0gW2xpbmVdOwogICAgbGV0IGRlcHRoID0gMDsKICAgIGZvciAoY29uc3QgYyBvZiBsaW5lKSB7IGlmIChjID09PSAnKCcpIGRlcHRoKys7IGVsc2UgaWYgKGMgPT09ICcpJykgZGVwdGgtLTsgfQogICAgaSsrOwogICAgd2hpbGUgKGkgPCBsaW5lcy5sZW5ndGggJiYgZGVwdGggPiAwKSB7CiAgICAgIGNvbnN0IGwgPSBsaW5lc1tpXTsKICAgICAgZm9yICdjb25zdCBjIG9mIGwpIHsgaWYgKGMgPT09ICcoJykgZGVwdGgrKzsgZWxzZSBpZiAoYyA9PT0gJyknKSBkZXB0aC0tOyB9CiAgICAgIGJsb2NrTGluZXMucHVzaChsKTsKICAgICAgaSsrOwogICAgfQogICAgY29uc3QgYmxvY2tTdHIgPSBibG9ja0xpbmVzLmpvaW4oJ1xuJyk7CiAgICBpZiAoYmxvY2tTdHIuaW5jbHVkZXMoJ3NlcnZpY2VPZicpIHx8IGJsb2NrU3RyLmluY2x1ZGVzKCdNb2R1bGVSZWdpc3RyeScpKSB7CiAgICAgIHJlbW92ZWRCbG9ja3MrKzsKICAgIH0gZWxzZSB7CiAgICAgIHJlc3VsdC5wdXNoLmFwcGx5KHJlc3VsdCwgYmxvY2tMaW5lcyk7CiAgICB9CiAgICBjb250aW51ZTsKICB9CiAgaWYgKC9bIFx0XSp0ZXN0UnVudGltZU9ubHlcKC4qc2VydmljZU9mLipcKS8udGVzdChsaW5lKSkgewogICAgcmVtb3ZlZEJsb2NrcysrOwogICAgaSsrOwogICAgY29udGludWU7CiAgfQogIGlmICgvXlsgXHRdKmltcG9ydFteXG5dKihzZXJ2aWNlT2Z8TW9kdWxlUmVnaXN0cnkpLy50ZXN0KGxpbmUpKSB7CiAgICByZW1vdmVkSW1wb3J0cysrOwogICAgaSsrOwogICAgY29udGludWU7CiAgfQogIHJlc3VsdC5wdXNoKGxpbmUpOwogIGkrKzsKfQpjb25zdCBvdXQgPSByZXN1bHQuam9pbignXG4nKTsKZnMud3JpdGVGaWxlU3luYyhmaWxlUGF0aCwgb3V0KTsKY29uc29sZS5sb2coJ1BhdGNoIHJlc3VsdDogUmVtb3ZlZCBibG9ja3M6JywgcmVtb3ZlZEJsb2NrcywgJ3wgUmVtb3ZlZCBpbXBvcnRzOicsIHJlbW92ZWRJbXBvcnRzKTsK" \
               | base64 -d > /tmp/patch_rn.js
             node /tmp/patch_rn.js "$PLUGIN_BUILD"
-            echo "--- serviceOf/ModuleRegistry lines AFTER patch ---"
             grep -n 'serviceOf\|ModuleRegistry' "$PLUGIN_BUILD" || echo "(none — patch OK)"
-          else
-            echo "WARNING: $PLUGIN_BUILD not found"
-            ls node_modules/@react-native/gradle-plugin/ || true
           fi
 
       # ── Gradle wrapper permissions ────────────────────────────
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      # ── Generate gradle-wrapper.jar via minimal isolated project ─
+      # ── Generate gradle-wrapper.jar ───────────────────────────
       - name: Generate gradle-wrapper.jar
         run: |
           GRADLE_VERSION="8.4"
@@ -85,7 +90,6 @@ jobs:
           "$GRADLE_BIN" wrapper --gradle-version "${GRADLE_VERSION}" --distribution-type bin
           cp gradle/wrapper/gradle-wrapper.jar \
             "$GITHUB_WORKSPACE/android/gradle/wrapper/gradle-wrapper.jar"
-          ls -lh "$GITHUB_WORKSPACE/android/gradle/wrapper/gradle-wrapper.jar"
           echo "gradle-wrapper.jar ready"
 
       # ── Setup Android SDK ─────────────────────────────────────
@@ -109,8 +113,7 @@ jobs:
             -keypass android \
             -dname "CN=Android Debug,O=Android,C=US"
 
-      # ── Debug: find RN gradle task names & generate PackageList ──
-      # continue-on-error so build proceeds even if tasks don't exist
+      # ── Debug + Generate PackageList ──────────────────────────
       - name: Debug + Generate PackageList
         working-directory: android
         continue-on-error: true
@@ -118,100 +121,69 @@ jobs:
           echo "=== Available tasks related to autolinking/package ==="
           ./gradlew :app:tasks --all --no-daemon 2>&1 \
             | grep -iE "package|autol|link|rncli|generat" | head -40 || true
-
           echo ""
-          echo "=== Try to generate PackageList (all known task names) ==="
+          echo "=== Try to generate PackageList ==="
           ./gradlew :app:generatePackageList --no-daemon 2>&1 | tail -5 || true
           ./gradlew :app:generateReleasePackageList --no-daemon 2>&1 | tail -5 || true
           ./gradlew :app:generateDebugPackageList --no-daemon 2>&1 | tail -5 || true
-
           echo ""
           echo "=== PackageList files found ==="
           find . -name "PackageList*" -type f 2>/dev/null || echo "(none)"
 
-          echo ""
-          echo "=== generated/rncli directory contents ==="
-          find app/build/generated/rncli -type f 2>/dev/null | head -20 || echo "(rncli dir empty or not found)"
-
-          echo ""
-          echo "=== generated/autolinking directory contents ==="
-          find . -path "*/generated/autolinking*" -type f 2>/dev/null | head -20 || echo "(autolinking dir empty or not found)"
+      # ── CLEAN: Eski build cache'i temizle (stale IS_NEW_ARCH fix) ─
+      - name: Clean build cache
+        working-directory: android
+        run: ./gradlew clean --no-daemon --no-build-cache
 
       # ── Build Release APKs ────────────────────────────────────
       - name: Build Release APKs
         working-directory: android
-        run: ./gradlew assembleRelease --stacktrace --no-daemon
+        run: ./gradlew assembleRelease --stacktrace --no-daemon --no-build-cache
 
       # ── Build Release AAB ─────────────────────────────────────
       - name: Build Release AAB
         working-directory: android
-        run: ./gradlew bundleRelease --stacktrace --no-daemon
+        run: ./gradlew bundleRelease --stacktrace --no-daemon --no-build-cache
 
-      # ── Verify output files ───────────────────────────────────
+      # ── Verify outputs ────────────────────────────────────────
       - name: Verify build outputs
         run: |
           echo "=== AAB ==="
           AAB=$(find android/app/build/outputs/bundle -name "*.aab" | head -1)
-          if [ -z "$AAB" ]; then
-            echo "ERROR: .aab file not found!"
-            exit 1
-          fi
+          if [ -z "$AAB" ]; then echo "ERROR: .aab not found!"; exit 1; fi
           ls -lh "$AAB"
           echo "AAB_PATH=$AAB" >> $GITHUB_ENV
 
           echo ""
           echo "=== APKs ==="
-          find android/app/build/outputs/apk/release -name "*.apk" | while read f; do
-            ls -lh "$f"
-          done
+          find android/app/build/outputs/apk/release -name "*.apk" | while read f; do ls -lh "$f"; done
 
-          # Versiyon bilgisi
           APP_VERSION=$(grep 'versionName' android/app/build.gradle | head -1 | grep -oP '"[^"]+"' | tr -d '"')
-          VERSION_CODE=$(grep 'versionCode' android/app/build.gradle | head -1 | grep -oP '\d+' | head -1)
+          VERSION_CODE=$(grep 'versionCode' android/app/build.gradle | grep -v 'versionCodeOverride' | head -1 | grep -oP '\d+' | head -1)
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
           echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
-          echo "App version: $APP_VERSION (code $VERSION_CODE)"
+          echo "Version: $APP_VERSION (build $VERSION_CODE)"
 
-      # ── Publish to GitHub Releases (artifact storage'dan bağımsız) ──
-      - name: Publish to GitHub Release
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: |
-          TAG="v${{ env.APP_VERSION }}-build${{ env.VERSION_CODE }}"
-          echo "Creating release: $TAG"
+      # ── Upload release-aab (Actions Artifacts) ────────────────
+      - name: Upload release-aab
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-aab
+          path: ${{ env.AAB_PATH }}
+          retention-days: 1
 
-          # Varolan release'i sil (aynı tag varsa)
-          gh release delete "$TAG" --yes 2>/dev/null || true
-          git tag -d "$TAG" 2>/dev/null || true
-          git push origin ":refs/tags/$TAG" 2>/dev/null || true
-
-          # Universal APK + AAB yükle
-          UNIVERSAL_APK=$(find android/app/build/outputs/apk/release -name "*universal*.apk" | head -1)
-          ARM64_APK=$(find android/app/build/outputs/apk/release -name "*arm64*release.apk" | head -1)
-
-          FILES="${{ env.AAB_PATH }}"
-          [ -n "$UNIVERSAL_APK" ] && FILES="$FILES $UNIVERSAL_APK"
-          [ -n "$ARM64_APK" ]    && FILES="$FILES $ARM64_APK"
-
-          gh release create "$TAG" $FILES \
-            --title "Velaud Recorder ${{ env.APP_VERSION }} (build ${{ env.VERSION_CODE }})" \
-            --notes "## Velaud Recorder ${{ env.APP_VERSION }}
-          **Build:** ${{ env.VERSION_CODE }} | **Commit:** ${{ github.sha }}
-
-          ### Değişiklikler
-          - Crash fix: StatusBarManager TurboModuleRegistry hatası giderildi (newArchEnabled=false)
-          - Yeni V ikonu (adaptive icon)
-
-          ### Dosyalar
-          - \`app-release.aab\` — Google Play için
-          - \`*universal*.apk\` — Tüm cihazlar için
-          - \`*arm64*.apk\` — Modern Android cihazlar için (önerilen)"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # ── Upload release-apks (Actions Artifacts) ───────────────
+      - name: Upload release-apks
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apks
+          path: android/app/build/outputs/apk/release/
+          retention-days: 1
 
       # ── Build Summary ─────────────────────────────────────────
       - name: Build Summary
         run: |
-          echo "## ✅ Velaud Recorder ${{ env.APP_VERSION }} Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Velaud Recorder ${{ env.APP_VERSION }} (build ${{ env.VERSION_CODE }})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### AAB" >> $GITHUB_STEP_SUMMARY
           echo "- \`$(basename ${{ env.AAB_PATH }})\` — $(du -h ${{ env.AAB_PATH }} | cut -f1)" >> $GITHUB_STEP_SUMMARY
@@ -220,5 +192,3 @@ jobs:
           find android/app/build/outputs/apk/release -name "*.apk" | while read f; do
             echo "- \`$(basename $f)\` — $(du -h $f | cut -f1)" >> $GITHUB_STEP_SUMMARY
           done
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "📦 Dosyalar GitHub Releases'te: https://github.com/${{ github.repository }}/releases" >> $GITHUB_STEP_SUMMARY

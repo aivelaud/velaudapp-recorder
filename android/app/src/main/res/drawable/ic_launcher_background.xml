@@ -1,16 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Adaptive icon background — Velaud Recorder v1.0.3
-  Orange-red solid matching the new V brand icon
--->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-
+    <!-- Kaynak görüntüden örneklenen renk: #EB6E4C -->
     <path
-        android:fillColor="#E84520"
+        android:fillColor="#EB6E4C"
         android:pathData="M0,0 L108,0 L108,108 L0,108 Z" />
-
 </vector>
