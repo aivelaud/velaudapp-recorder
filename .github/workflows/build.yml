@@ -160,18 +160,20 @@ jobs:
       # ── Upload release-aab ────────────────────────────────────
       - name: Upload release-aab
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: release-aab
           path: ${{ env.AAB_PATH }}
-          retention-days: 14
+          retention-days: 3
 
       # ── Upload release-apks ───────────────────────────────────
       - name: Upload release-apks
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: release-apks
           path: android/app/build/outputs/apk/release/
-          retention-days: 14
+          retention-days: 3
 
       # ── Build Summary ─────────────────────────────────────────
       - name: Build Summary
