@@ -11,6 +11,8 @@ jobs:
     name: Build APK & AAB
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: write   # GitHub Release oluşturmak için gerekli
 
     steps:
       # ── Checkout ──────────────────────────────────────────────
@@ -145,46 +147,78 @@ jobs:
         working-directory: android
         run: ./gradlew bundleRelease --stacktrace --no-daemon
 
-      # ── Verify AAB exists ─────────────────────────────────────
-      - name: Verify AAB exists
+      # ── Verify output files ───────────────────────────────────
+      - name: Verify build outputs
         run: |
+          echo "=== AAB ==="
           AAB=$(find android/app/build/outputs/bundle -name "*.aab" | head -1)
           if [ -z "$AAB" ]; then
             echo "ERROR: .aab file not found!"
             exit 1
           fi
-          echo "AAB_PATH=$AAB" >> $GITHUB_ENV
-          echo "Found AAB: $AAB"
           ls -lh "$AAB"
+          echo "AAB_PATH=$AAB" >> $GITHUB_ENV
 
-      # ── Upload release-aab ────────────────────────────────────
-      - name: Upload release-aab
-        uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: release-aab
-          path: ${{ env.AAB_PATH }}
-          retention-days: 3
+          echo ""
+          echo "=== APKs ==="
+          find android/app/build/outputs/apk/release -name "*.apk" | while read f; do
+            ls -lh "$f"
+          done
 
-      # ── Upload release-apks ───────────────────────────────────
-      - name: Upload release-apks
-        uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: release-apks
-          path: android/app/build/outputs/apk/release/
-          retention-days: 3
+          # Versiyon bilgisi
+          APP_VERSION=$(grep 'versionName' android/app/build.gradle | head -1 | grep -oP '"[^"]+"' | tr -d '"')
+          VERSION_CODE=$(grep 'versionCode' android/app/build.gradle | head -1 | grep -oP '\d+' | head -1)
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+          echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
+          echo "App version: $APP_VERSION (code $VERSION_CODE)"
+
+      # ── Publish to GitHub Releases (artifact storage'dan bağımsız) ──
+      - name: Publish to GitHub Release
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          TAG="v${{ env.APP_VERSION }}-build${{ env.VERSION_CODE }}"
+          echo "Creating release: $TAG"
+
+          # Varolan release'i sil (aynı tag varsa)
+          gh release delete "$TAG" --yes 2>/dev/null || true
+          git tag -d "$TAG" 2>/dev/null || true
+          git push origin ":refs/tags/$TAG" 2>/dev/null || true
+
+          # Universal APK + AAB yükle
+          UNIVERSAL_APK=$(find android/app/build/outputs/apk/release -name "*universal*.apk" | head -1)
+          ARM64_APK=$(find android/app/build/outputs/apk/release -name "*arm64*release.apk" | head -1)
+
+          FILES="${{ env.AAB_PATH }}"
+          [ -n "$UNIVERSAL_APK" ] && FILES="$FILES $UNIVERSAL_APK"
+          [ -n "$ARM64_APK" ]    && FILES="$FILES $ARM64_APK"
+
+          gh release create "$TAG" $FILES \
+            --title "Velaud Recorder ${{ env.APP_VERSION }} (build ${{ env.VERSION_CODE }})" \
+            --notes "## Velaud Recorder ${{ env.APP_VERSION }}
+          **Build:** ${{ env.VERSION_CODE }} | **Commit:** ${{ github.sha }}
+
+          ### Değişiklikler
+          - Crash fix: StatusBarManager TurboModuleRegistry hatası giderildi (newArchEnabled=false)
+          - Yeni V ikonu (adaptive icon)
+
+          ### Dosyalar
+          - \`app-release.aab\` — Google Play için
+          - \`*universal*.apk\` — Tüm cihazlar için
+          - \`*arm64*.apk\` — Modern Android cihazlar için (önerilen)"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ── Build Summary ─────────────────────────────────────────
       - name: Build Summary
         run: |
-          echo "## ✅ Velaud Recorder Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Velaud Recorder ${{ env.APP_VERSION }} Build Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### release-aab" >> $GITHUB_STEP_SUMMARY
+          echo "### AAB" >> $GITHUB_STEP_SUMMARY
           echo "- \`$(basename ${{ env.AAB_PATH }})\` — $(du -h ${{ env.AAB_PATH }} | cut -f1)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### release-apks" >> $GITHUB_STEP_SUMMARY
+          echo "### APKs" >> $GITHUB_STEP_SUMMARY
           find android/app/build/outputs/apk/release -name "*.apk" | while read f; do
-            SIZE=$(du -h "$f" | cut -f1)
-            echo "- \`$(basename $f)\` — $SIZE" >> $GITHUB_STEP_SUMMARY
+            echo "- \`$(basename $f)\` — $(du -h $f | cut -f1)" >> $GITHUB_STEP_SUMMARY
           done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📦 Dosyalar GitHub Releases'te: https://github.com/${{ github.repository }}/releases" >> $GITHUB_STEP_SUMMARY
