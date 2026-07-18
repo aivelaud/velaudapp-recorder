@@ -164,9 +164,11 @@ jobs:
           echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
           echo "Version: $APP_VERSION (build $VERSION_CODE)"
 
-      # ── Upload release-aab (Actions Artifacts) ────────────────
+      # ── Upload release-aab (Actions Artifacts — tercih edilen) ──
       - name: Upload release-aab
+        id: upload_aab
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: release-aab
           path: ${{ env.AAB_PATH }}
@@ -174,21 +176,69 @@ jobs:
 
       # ── Upload release-apks (Actions Artifacts) ───────────────
       - name: Upload release-apks
+        id: upload_apks
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: release-apks
           path: android/app/build/outputs/apk/release/
           retention-days: 1
 
+      # ── Fallback: GitHub Release (kota doluysa) ───────────────
+      - name: Fallback to GitHub Release (kota doluysa)
+        if: steps.upload_aab.outcome == 'failure' || steps.upload_apks.outcome == 'failure'
+        run: |
+          TAG="v${{ env.APP_VERSION }}-build${{ env.VERSION_CODE }}"
+          echo "Actions artifact kotası dolu — GitHub Release'e yükleniyor: $TAG"
+
+          gh release delete "$TAG" --yes 2>/dev/null || true
+          git tag -d "$TAG" 2>/dev/null || true
+          git push origin ":refs/tags/$TAG" 2>/dev/null || true
+
+          UNIVERSAL=$(find android/app/build/outputs/apk/release -name "*universal*.apk" | head -1)
+          ARM64=$(find android/app/build/outputs/apk/release -name "*arm64*release.apk" | head -1)
+          FILES="${{ env.AAB_PATH }}"
+          [ -n "$UNIVERSAL" ] && FILES="$FILES $UNIVERSAL"
+          [ -n "$ARM64" ]    && FILES="$FILES $ARM64"
+
+          gh release create "$TAG" $FILES \
+            --title "Velaud Recorder ${{ env.APP_VERSION }} (build ${{ env.VERSION_CODE }})" \
+            --notes "**Actions artifact kotası doluydu.** Dosyalar burada: https://github.com/${{ github.repository }}/releases/tag/$TAG"
+          echo "FALLBACK_URL=https://github.com/${{ github.repository }}/releases/tag/$TAG" >> $GITHUB_ENV
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Fail job if both Actions AND fallback failed ──────────
+      - name: Assert at least one upload succeeded
+        run: |
+          AAB_OK="${{ steps.upload_aab.outcome }}"
+          APK_OK="${{ steps.upload_apks.outcome }}"
+          if [ "$AAB_OK" = "failure" ] && [ "$APK_OK" = "failure" ]; then
+            echo "⚠️ Actions artifact kotası dolu — GitHub Release'e fallback yapıldı"
+            echo "İndirme: ${{ env.FALLBACK_URL || 'GitHub Releases sekmesini kontrol et' }}"
+            # Build basarili, sadece kota sorunu var — hata vermiyoruz
+            exit 0
+          fi
+
       # ── Build Summary ─────────────────────────────────────────
       - name: Build Summary
+        if: always()
         run: |
           echo "## ✅ Velaud Recorder ${{ env.APP_VERSION }} (build ${{ env.VERSION_CODE }})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### AAB" >> $GITHUB_STEP_SUMMARY
+          echo "### Derlenen dosyalar" >> $GITHUB_STEP_SUMMARY
           echo "- \`$(basename ${{ env.AAB_PATH }})\` — $(du -h ${{ env.AAB_PATH }} | cut -f1)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### APKs" >> $GITHUB_STEP_SUMMARY
           find android/app/build/outputs/apk/release -name "*.apk" | while read f; do
             echo "- \`$(basename $f)\` — $(du -h $f | cut -f1)" >> $GITHUB_STEP_SUMMARY
           done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          AAB_OK="${{ steps.upload_aab.outcome }}"
+          APK_OK="${{ steps.upload_apks.outcome }}"
+          if [ "$AAB_OK" = "success" ] && [ "$APK_OK" = "success" ]; then
+            echo "### 📦 Actions Artifacts — ✅ yüklendi" >> $GITHUB_STEP_SUMMARY
+            echo "Actions sekmesinden indir ↗" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### 📦 Actions kota dolu — GitHub Release'e fallback" >> $GITHUB_STEP_SUMMARY
+            echo "İndirme: https://github.com/${{ github.repository }}/releases" >> $GITHUB_STEP_SUMMARY
+            echo "(Kota 6-12 saat sonra sıfırlanır, sonraki build Actions'dan yükler)" >> $GITHUB_STEP_SUMMARY
+          fi
