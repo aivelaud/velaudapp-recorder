@@ -133,7 +133,23 @@ jobs:
       # ── CLEAN: Eski build cache'i temizle (stale IS_NEW_ARCH fix) ─
       - name: Clean build cache
         working-directory: android
-        run: ./gradlew clean --no-daemon --no-build-cache
+        run: |
+          ./gradlew clean --no-daemon --no-build-cache
+          # CMake cache de temizlenir — yoksa rncli.h include path'i stale kalır
+          rm -rf app/.cxx/
+
+      # ── New Arch Codegen: rncli.h üret (clean sonrası silinir, yeniden gerekli) ─
+      - name: Generate New Arch codegen artifacts (rncli.h)
+        working-directory: android
+        run: |
+          echo "=== generateCodegenSchemaFromJavaScript ==="
+          ./gradlew :app:generateCodegenSchemaFromJavaScript --no-daemon --no-build-cache 2>&1 | tail -8
+          echo ""
+          echo "=== generateCodegenArtifactsFromSchema ==="
+          ./gradlew :app:generateCodegenArtifactsFromSchema --no-daemon --no-build-cache 2>&1 | tail -8
+          echo ""
+          echo "=== rncli.h kontrol ==="
+          find . -name "rncli.h" 2>/dev/null && echo "OK" || echo "(henüz yok — assembleRelease üretecek)"
 
       # ── Build Release APKs ────────────────────────────────────
       - name: Build Release APKs
