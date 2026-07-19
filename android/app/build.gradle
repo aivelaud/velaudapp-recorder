@@ -96,19 +96,20 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.multidex:multidex:2.0.1'
 
-    // ── Ads ───────────────────────────────────────────────────────────────────
+    // ── Ads (Google SDK — direct AAR, no RN bridge) ───────────────────────────
+    // NOTE: react-native-google-mobile-ads JS bridge is excluded from manual
+    // autolinking because v14.x requires new arch (ViewGroupManager constructor
+    // change). MobileAds.initialize() in MainApplication uses this SDK directly.
     implementation 'com.google.android.gms:play-services-ads:23.2.0'
 
     // ── Manual autolinking — native module sub-projects ───────────────────────
-    // These mirror the explicit includes in settings.gradle.kts.
-    // Previously, autolinkLibrariesFromCommandOrDefault() was supposed to add
-    // these automatically but silently failed in CI for every build.
-    // Classes from these sub-projects are now always compiled into the APK.
+    // Mirror of explicit includes in settings.gradle.kts.
+    // Previously autolinkLibrariesFromCommandOrDefault() silently returned zero
+    // results in CI — these were never compiled into the APK.
     implementation project(':react-native-screens')
     implementation project(':react-native-safe-area-context')
     implementation project(':react-native-vector-icons')
     implementation project(':react-native-video')
-    implementation project(':react-native-google-mobile-ads')
     implementation project(':react-native-async-storage')
     implementation project(':react-native-share')
 }
