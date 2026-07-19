@@ -3,29 +3,37 @@ package com.facebook.react
 import android.app.Application
 import android.util.Log
 import com.facebook.react.ReactPackage
+import com.facebook.react.shell.MainReactPackage
 
 /**
  * Hand-written autolinking shim for this project.
  *
- * The @react-native/gradle-plugin does NOT generate PackageList.kt automatically
- * in this Gradle 8.4 + RN 0.74 configuration (autolinking resolves native
- * modules as runtime-only dependencies — classes are present in the final DEX
- * but are absent from the compile classpath, so direct imports fail at build time).
+ * ROOT CAUSE OF CRASH (fixed here):
+ * In RN 0.74, StatusBarModule and NativeAnimatedModule live in MainReactPackage
+ * (com.facebook.react.shell). They are NOT in CoreModulesPackage. When old-arch
+ * bridge mode is active, TurboModuleRegistry.requireModule() first checks
+ * NativeModules[name]. If MainReactPackage is absent, StatusBarManager and
+ * NativeAnimatedModule are never registered → TurboModuleRegistry.getEnforcing()
+ * throws the fatal "could not be found" crash.
  *
- * This file is committed to source and provides an identical public API to the
- * generated version. Third-party packages are instantiated via reflection so that
- * compile-time classpath visibility is not required.
+ * FIX: Always add MainReactPackage() first. Third-party packages follow via
+ * reflection (autolinking includes their AARs even with newArchEnabled=false).
  *
- * ⚠  Update the class-name list below whenever you add or remove a native RN dep.
+ * ⚠ Update the reflection list below whenever you add or remove a native RN dep.
  */
 class PackageList(private val application: Application) {
 
-    /**
-     * All autolinked native packages for this project.
-     * Evaluated lazily once on first access; errors are logged and skipped.
-     */
     val packages: List<ReactPackage> by lazy {
         buildList {
+            // ── CORE: must be first ───────────────────────────────────────────
+            // Provides StatusBarModule (StatusBarManager), NativeAnimatedModule,
+            // and other built-in RN native modules that are NOT in CoreModulesPackage.
+            add(MainReactPackage())
+
+            // ── THIRD-PARTY (autolinked) ──────────────────────────────────────
+            // Instantiated via reflection so compile-time classpath visibility
+            // is not required (autolinking includes AARs at link time).
+
             // react-native-screens ^3.35.0
             reflectAdd("com.swmansion.rnscreens.RNScreensPackage")
             // react-native-safe-area-context ^4.12.0
@@ -50,7 +58,6 @@ class PackageList(private val application: Application) {
             val instance = try {
                 clazz.getDeclaredConstructor().newInstance()
             } catch (_: NoSuchMethodException) {
-                // Some packages take an Application in their constructor
                 clazz.getDeclaredConstructor(Application::class.java).newInstance(application)
             }
             add(instance)
