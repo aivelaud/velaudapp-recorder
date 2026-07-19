@@ -1,110 +1,64 @@
 package com.facebook.react
 
 import android.app.Application
-import android.util.Log
 import com.facebook.react.ReactPackage
 import com.facebook.react.shell.MainReactPackage
+import com.swmansion.rnscreens.RNScreensPackage
+import com.th3rdwave.safeareacontext.SafeAreaContextPackage
+import com.oblador.vectoricons.VectorIconsPackage
+import com.brentvatne.react.ReactVideoPackage
+import io.invertase.googlemobileads.ReactNativeGoogleMobileAdsPackage
+import com.reactnativecommunity.asyncstorage.AsyncStoragePackage
+import cl.json.RNSharePackage
 
 /**
- * Hand-written autolinking shim for this project.
+ * Hand-written package list — permanent replacement for broken autolinking.
  *
  * WHY THIS FILE EXISTS:
- * The standard autolinking system (com.facebook.react.settings plugin) generates
- * a PackageList.java in the build directory. However, in this project's CI
- * environment that generated file is not reliably placed on the compile classpath,
- * so we maintain this explicit shim instead.
+ * The standard autolinking system (com.facebook.react.settings plugin) is
+ * supposed to generate a PackageList.java in the build directory. However,
+ * in this project's CI environment the discovery command ("react-native config")
+ * runs but produces zero results — 4 consecutive build logs show NO
+ * ":react-native-screens:*" or other third-party native-module tasks.
+ * Without explicit Gradle sub-project includes (now in settings.gradle.kts),
+ * those classes never compile into the APK, causing ClassNotFoundException.
  *
- * WHY REFLECTION FOR THIRD-PARTY PACKAGES:
- * Direct imports (e.g. `import com.swmansion.rnscreens.RNScreensPackage`) fail
- * at compile time in CI because autolinking sub-projects are not resolved as
- * compile-time classpath entries in the CI Gradle configuration. Reflection
- * defers class lookup to runtime, where the AARs are always present (included
- * by the autolinking Gradle plugin).
+ * With `newArchEnabled=false` the codegen step that generates PackageList.java
+ * is SKIPPED (confirmed: "generateCodegenArtifactsFromSchema SKIPPED" in CI
+ * logs), so this file is the sole PackageList — no duplicate-class conflict.
  *
- * WHY MainReactPackage IS ADDED DIRECTLY:
- * RN 0.74 moved StatusBarModule (StatusBarManager) and NativeAnimatedModule out
- * of CoreModulesPackage into MainReactPackage (com.facebook.react.shell).
- * Without it in old-arch (bridge) mode, TurboModuleRegistry.getEnforcing()
- * throws a fatal "could not be found" crash on launch.
- * MainReactPackage is in the react-android AAR, so it IS on the compile
- * classpath and can be imported directly.
+ * WHY DIRECT IMPORTS (NOT REFLECTION):
+ * All packages are now declared as explicit Gradle sub-projects in
+ * settings.gradle.kts and as `implementation project(...)` deps in
+ * app/build.gradle. Their classes are on the Kotlin compile classpath, so
+ * direct imports are compile-time safe. Any missing class → BUILD FAILURE,
+ * not a runtime crash — the error is caught before an APK is ever produced.
  *
- * WHY REFLECTION THROWS ON FAILURE:
- * Previous version swallowed instantiation exceptions silently (catch + Log.e),
- * causing packages to be silently dropped → "RNCSafeAreaProvider not found in
- * UIManager" crash with no clear indication of which package failed.
- * Now any failure throws immediately with the root cause, so the crash log
- * identifies exactly what went wrong.
+ * WHY MainReactPackage IS FIRST:
+ * RN 0.74 moved StatusBarModule and NativeAnimatedModule out of
+ * CoreModulesPackage into MainReactPackage. Without it in old-arch (bridge)
+ * mode, TurboModuleRegistry.getEnforcing() throws a fatal crash on launch.
+ * MainReactPackage is in the react-android AAR — always available.
  *
- * WHY ProGuard KEEP RULES ARE NEEDED:
- * R8 does not treat Class.forName("...") string literals as class references
- * for tree-shaking purposes. Without explicit -keep rules in proguard-rules.pro,
- * R8 strips the package classes as "unreachable code" → ClassNotFoundException
- * at runtime. See the -keep rules in proguard-rules.pro (section 7).
- *
- * ⚠  Keep this list in sync with package.json dependencies.
- * ⚠  Add a corresponding -keep rule in proguard-rules.pro for every new entry.
+ * ⚠  Keep this list in sync with:
+ *    • package.json dependencies
+ *    • settings.gradle.kts manual autolinking section
+ *    • android/app/build.gradle implementation project(...) deps
  */
 class PackageList(private val application: Application) {
 
-    val packages: List<ReactPackage> by lazy {
-        buildList {
-            // ── CORE (must be first) ──────────────────────────────────────────
-            // react-android AAR → direct import OK
-            add(MainReactPackage())
+    val packages: List<ReactPackage> = listOf(
+        // Core (must be first) — from react-android AAR
+        MainReactPackage(),
 
-            // ── THIRD-PARTY (via autolinking AARs) ───────────────────────────
-            // Instantiated via reflection; proguard-rules.pro keeps these classes.
-            // Any failure throws RuntimeException immediately (no silent drops).
-
-            reflectAdd("com.swmansion.rnscreens.RNScreensPackage")          // react-native-screens
-            reflectAdd("com.th3rdwave.safeareacontext.SafeAreaContextPackage") // react-native-safe-area-context
-            reflectAdd("com.oblador.vectoricons.VectorIconsPackage")          // react-native-vector-icons
-            reflectAdd("com.brentvatne.react.ReactVideoPackage")              // react-native-video
-            reflectAdd("io.invertase.googlemobileads.ReactNativeGoogleMobileAdsPackage") // react-native-google-mobile-ads
-            reflectAdd("com.reactnativecommunity.asyncstorage.AsyncStoragePackage")       // @react-native-async-storage/async-storage
-            reflectAdd("cl.json.RNSharePackage")                              // react-native-share
-        }
-    }
-
-    /**
-     * Instantiates a ReactPackage by class name via reflection and adds it
-     * to the receiver list.
-     *
-     * Tries no-arg constructor first; falls back to single-Application-arg
-     * constructor. Any failure (ClassNotFound, instantiation error, etc.)
-     * throws RuntimeException — callers must NOT swallow this so the crash
-     * log clearly identifies the failing package.
-     */
-    private fun MutableList<ReactPackage>.reflectAdd(className: String) {
-        try {
-            @Suppress("UNCHECKED_CAST")
-            val clazz = Class.forName(className) as Class<out ReactPackage>
-            val instance: ReactPackage = try {
-                clazz.getDeclaredConstructor().newInstance()
-            } catch (_: NoSuchMethodException) {
-                // Some packages require Application context in their constructor
-                clazz.getDeclaredConstructor(Application::class.java).newInstance(application)
-            }
-            add(instance)
-            Log.d("PackageList", "✓ Registered $className")
-        } catch (e: ClassNotFoundException) {
-            // Package class is missing from the APK — likely a ProGuard strip
-            // or the AAR was not included by autolinking. Throw immediately
-            // so the crash log names the culprit.
-            throw RuntimeException(
-                "PackageList: ClassNotFoundException for '$className'. " +
-                "Check that (a) the package is in package.json, (b) npm install ran, " +
-                "and (c) proguard-rules.pro has a -keep rule for this class.",
-                e
-            )
-        } catch (e: Exception) {
-            // Constructor or static-initializer threw — surface it immediately.
-            throw RuntimeException(
-                "PackageList: failed to instantiate '$className'. " +
-                "Root cause: ${e.javaClass.simpleName}: ${e.message}",
-                e
-            )
-        }
-    }
+        // Third-party — compiled as explicit Gradle sub-projects via
+        // the manual autolinking section in settings.gradle.kts
+        RNScreensPackage(),                      // react-native-screens
+        SafeAreaContextPackage(),                // react-native-safe-area-context
+        VectorIconsPackage(),                    // react-native-vector-icons
+        ReactVideoPackage(),                     // react-native-video
+        ReactNativeGoogleMobileAdsPackage(),     // react-native-google-mobile-ads
+        AsyncStoragePackage(),                   // @react-native-async-storage/async-storage
+        RNSharePackage(),                        // react-native-share
+    )
 }

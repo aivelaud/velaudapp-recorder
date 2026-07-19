@@ -16,8 +16,8 @@ android {
         applicationId "com.recvelaud.android"
         minSdk rootProject.ext.minSdkVersion
         targetSdk rootProject.ext.targetSdkVersion
-        versionCode 9
-        versionName "1.0.8"
+        versionCode 10
+        versionName "1.0.9"
         multiDexEnabled true
     }
 
@@ -58,15 +58,6 @@ android {
         jvmTarget = "17"
     }
 
-    // Register both possible locations where the RN gradle plugin
-    // might emit PackageList.kt (varies by plugin version / AGP version)
-    sourceSets {
-        main {
-            java.srcDir("${project.buildDir}/generated/rncli/src/main/java")
-            java.srcDir("${rootProject.buildDir}/generated/autolinking/src/main/java")
-        }
-    }
-
     // ABI splits only – no density/language bloat
     splits {
         abi {
@@ -95,14 +86,29 @@ android.applicationVariants.all { variant ->
 }
 
 dependencies {
+    // ── React Native core ─────────────────────────────────────────────────────
     implementation("com.facebook.react:react-android")
     implementation("com.facebook.react:hermes-android")
 
+    // ── Kotlin / AndroidX ─────────────────────────────────────────────────────
     implementation "org.jetbrains.kotlin:kotlin-stdlib:${rootProject.ext.kotlinVersion}"
-
     implementation 'androidx.core:core-ktx:1.13.1'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.multidex:multidex:2.0.1'
 
+    // ── Ads ───────────────────────────────────────────────────────────────────
     implementation 'com.google.android.gms:play-services-ads:23.2.0'
+
+    // ── Manual autolinking — native module sub-projects ───────────────────────
+    // These mirror the explicit includes in settings.gradle.kts.
+    // Previously, autolinkLibrariesFromCommandOrDefault() was supposed to add
+    // these automatically but silently failed in CI for every build.
+    // Classes from these sub-projects are now always compiled into the APK.
+    implementation project(':react-native-screens')
+    implementation project(':react-native-safe-area-context')
+    implementation project(':react-native-vector-icons')
+    implementation project(':react-native-video')
+    implementation project(':react-native-google-mobile-ads')
+    implementation project(':react-native-async-storage')
+    implementation project(':react-native-share')
 }
