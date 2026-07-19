@@ -12,16 +12,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
-      contents: write   # Artifact temizliği için
+      contents: write
 
     steps:
       # ── Eski artifact'ları sil (storage kotası açmak için) ────────
       - name: Delete old artifacts
         run: |
           echo "Eski artifact'lar siliniyor..."
-          ARTIFACTS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          ARTIFACTS=$(curl -s \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/actions/artifacts?per_page=100" \
-            | python3 -c "import sys,json; arts=json.load(sys.stdin)['artifacts']; [print(a['id']) for a in arts]" 2>/dev/null || true)
+            | node -e "const d=require('fs').readFileSync('/dev/stdin','utf8'); const j=JSON.parse(d); (j.artifacts||[]).forEach(a=>console.log(a.id));" 2>/dev/null || true)
 
           for id in $ARTIFACTS; do
             curl -s -X DELETE \
@@ -53,7 +55,7 @@ jobs:
       - name: Install npm dependencies
         run: npm install --legacy-peer-deps
 
-      # ── Patch react-native gradle plugin ──────────────────────────────────
+      # ── Patch react-native gradle plugin (CI compat) ──────────
       - name: Patch react-native gradle plugin (CI compat)
         run: |
           SETTINGS="node_modules/@react-native/gradle-plugin/settings.gradle.kts"
@@ -113,44 +115,6 @@ jobs:
             -keypass android \
             -dname "CN=Android Debug,O=Android,C=US"
 
-      # ── Debug + Generate PackageList ──────────────────────────
-      - name: Debug + Generate PackageList
-        working-directory: android
-        continue-on-error: true
-        run: |
-          echo "=== Available tasks related to autolinking/package ==="
-          ./gradlew :app:tasks --all --no-daemon 2>&1 \
-            | grep -iE "package|autol|link|rncli|generat" | head -40 || true
-          echo ""
-          echo "=== Try to generate PackageList ==="
-          ./gradlew :app:generatePackageList --no-daemon 2>&1 | tail -5 || true
-          ./gradlew :app:generateReleasePackageList --no-daemon 2>&1 | tail -5 || true
-          ./gradlew :app:generateDebugPackageList --no-daemon 2>&1 | tail -5 || true
-          echo ""
-          echo "=== PackageList files found ==="
-          find . -name "PackageList*" -type f 2>/dev/null || echo "(none)"
-
-      # ── CLEAN: Eski build cache'i temizle (stale IS_NEW_ARCH fix) ─
-      - name: Clean build cache
-        working-directory: android
-        run: |
-          ./gradlew clean --no-daemon --no-build-cache
-          # CMake cache de temizlenir — yoksa rncli.h include path'i stale kalır
-          rm -rf app/.cxx/
-
-      # ── New Arch Codegen: rncli.h üret (clean sonrası silinir, yeniden gerekli) ─
-      - name: Generate New Arch codegen artifacts (rncli.h)
-        working-directory: android
-        run: |
-          echo "=== generateCodegenSchemaFromJavaScript ==="
-          ./gradlew :app:generateCodegenSchemaFromJavaScript --no-daemon --no-build-cache 2>&1 | tail -8
-          echo ""
-          echo "=== generateCodegenArtifactsFromSchema ==="
-          ./gradlew :app:generateCodegenArtifactsFromSchema --no-daemon --no-build-cache 2>&1 | tail -8
-          echo ""
-          echo "=== rncli.h kontrol ==="
-          find . -name "rncli.h" 2>/dev/null && echo "OK" || echo "(henüz yok — assembleRelease üretecek)"
-
       # ── Build Release APKs ────────────────────────────────────
       - name: Build Release APKs
         working-directory: android
@@ -204,10 +168,9 @@ jobs:
       - name: Fallback to GitHub Release (kota doluysa)
         if: steps.upload_aab.outcome == 'failure' || steps.upload_apks.outcome == 'failure'
         run: |
-          TAG="v${{ env.APP_VERSION }}-build${{ env.VERSION_CODE }}"
-          echo "Actions artifact kotası dolu — GitHub Release'e yükleniyor: $TAG"
-
-          gh release delete "$TAG" --yes 2>/dev/null || true
+          TAG="build-${{ github.run_number }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag -d "$TAG" 2>/dev/null || true
           git push origin ":refs/tags/$TAG" 2>/dev/null || true
 
@@ -232,7 +195,6 @@ jobs:
           if [ "$AAB_OK" = "failure" ] && [ "$APK_OK" = "failure" ]; then
             echo "⚠️ Actions artifact kotası dolu — GitHub Release'e fallback yapıldı"
             echo "İndirme: ${{ env.FALLBACK_URL || 'GitHub Releases sekmesini kontrol et' }}"
-            # Build basarili, sadece kota sorunu var — hata vermiyoruz
             exit 0
           fi
 
@@ -243,8 +205,9 @@ jobs:
           echo "## ✅ Velaud Recorder ${{ env.APP_VERSION }} (build ${{ env.VERSION_CODE }})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Derlenen dosyalar" >> $GITHUB_STEP_SUMMARY
-          echo "- \`$(basename ${{ env.AAB_PATH }})\` — $(du -h ${{ env.AAB_PATH }} | cut -f1)" >> $GITHUB_STEP_SUMMARY
-          find android/app/build/outputs/apk/release -name "*.apk" | while read f; do
+          AAB="${{ env.AAB_PATH }}"
+          [ -f "$AAB" ] && echo "- \`$(basename $AAB)\` — $(du -h $AAB | cut -f1)" >> $GITHUB_STEP_SUMMARY
+          find android/app/build/outputs/apk/release -name "*.apk" 2>/dev/null | while read f; do
             echo "- \`$(basename $f)\` — $(du -h $f | cut -f1)" >> $GITHUB_STEP_SUMMARY
           done
           echo "" >> $GITHUB_STEP_SUMMARY

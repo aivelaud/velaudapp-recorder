@@ -9,7 +9,6 @@ import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeHost
 import com.facebook.react.ReactPackage
-import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.load
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.soloader.SoLoader
@@ -55,9 +54,7 @@ class MainApplication : Application(), ReactApplication {
 
         super.onCreate()
         SoLoader.init(this, false)
-        // RN 0.74: load() her zaman çağrılmalı — codegen'ın ürettiği C++ TurboModule'ları
         // (StatusBarManager dahil) kayıt eder. Çağrılmazsa TurboModule registry boş kalır → crash.
-        load()
         // Initialize AdMob SDK. Wrapped in try-catch so that any AdMob
         // initialisation failure does not crash the whole app at startup.
         try {
