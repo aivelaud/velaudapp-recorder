@@ -56,6 +56,11 @@ class RecorderModule(private val reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun startRecording(config: ReadableMap, promise: Promise) {
+        if (recordService?.isRecordingActive() == true) {
+            Log.w(TAG, "startRecording called while a recording is already active — ignoring")
+            promise.resolve(true)
+            return
+        }
         val activity = currentActivity ?: run {
             promise.reject("NO_ACTIVITY", "Activity not available")
             return

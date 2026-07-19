@@ -147,8 +147,20 @@ export default function HomeScreen() {
         return;
       }
 
-      // 4. Show floating panel
-      await FloatingPanel.showPanel();
+      // 4. Show floating panel — this is a *secondary* UI convenience (lets the
+      // user pause/stop while inside another app). Recording itself already
+      // started via the foreground service above, so a panel failure here must
+      // NEVER be reported as "recording failed" — that was misleading users
+      // into thinking nothing was captured when the video was actually fine.
+      try {
+        await FloatingPanel.showPanel();
+      } catch (panelErr: any) {
+        console.warn('Floating panel could not be shown:', panelErr);
+        ToastAndroid.show(
+          'Kayıt başladı, ancak kontrol paneli gösterilemedi. Durdurmak için bildirimi kullanabilirsiniz.',
+          ToastAndroid.LONG,
+        );
+      }
       ToastAndroid.show('Kayıt başladı!', ToastAndroid.SHORT);
     } catch (e: any) {
       console.error('Recording start error:', e);

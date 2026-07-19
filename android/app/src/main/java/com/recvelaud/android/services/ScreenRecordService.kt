@@ -68,12 +68,40 @@ class ScreenRecordService : Service() {
     private var pauseStartMs = 0L
     private var durationTimer: Timer? = null
     private val handler = Handler(Looper.getMainLooper())
+    private var projectionCallback: MediaProjection.Callback? = null
 
     override fun onBind(intent: Intent?): IBinder = binder
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Service can be killed by the system (low memory, task removed, etc.)
+        // without stopRecording() ever being called — release everything here
+        // too, otherwise MediaProjection/MediaRecorder/VirtualDisplay leak and
+        // the next recording attempt fails silently or crashes.
+        try {
+            durationTimer?.cancel()
+            durationTimer = null
+            if (isRecording) {
+                try { mediaRecorder?.stop() } catch (_: Exception) {}
+            }
+            mediaRecorder?.release()
+            virtualDisplay?.release()
+            projectionCallback?.let { mediaProjection?.unregisterCallback(it) }
+            mediaProjection?.stop()
+        } catch (_: Exception) {
+        } finally {
+            mediaRecorder = null
+            virtualDisplay = null
+            mediaProjection = null
+            projectionCallback = null
+            isRecording = false
+            isPaused = false
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -88,6 +116,12 @@ class ScreenRecordService : Service() {
     }
 
     private fun startRecording(intent: Intent) {
+        if (isRecording) {
+            Log.w(TAG, "startRecording called while already recording — ignoring duplicate start")
+            emitStatus()
+            return
+        }
+
         val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, -1)
         val resultData: Intent? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(EXTRA_RESULT_DATA, Intent::class.java)
@@ -127,6 +161,22 @@ class ScreenRecordService : Service() {
                 stopSelf()
                 return
             }
+
+            // CRITICAL (Android 14 / API 34+ requirement): a MediaProjection.Callback
+            // MUST be registered before the projection is used to create a VirtualDisplay.
+            // Without this, the OS is allowed to invalidate the projection session at any
+            // time (e.g. the moment the app is backgrounded or another app comes to the
+            // foreground), which is exactly why recording other apps / background capture
+            // was silently failing. The callback also lets us react cleanly (stop the
+            // service, release the recorder) when the user stops the projection from the
+            // system "Stop casting" notification, instead of crashing.
+            projectionCallback = object : MediaProjection.Callback() {
+                override fun onStop() {
+                    Log.w(TAG, "MediaProjection.onStop() — projection revoked by system/user")
+                    handler.post { stopRecording() }
+                }
+            }
+            mediaProjection?.registerCallback(projectionCallback, handler)
 
             // Set up MediaRecorder
             mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -229,12 +279,14 @@ class ScreenRecordService : Service() {
             try {
                 mediaRecorder?.release()
                 virtualDisplay?.release()
+                projectionCallback?.let { mediaProjection?.unregisterCallback(it) }
                 mediaProjection?.stop()
             } catch (_: Exception) {}
             
             mediaRecorder = null
             virtualDisplay = null
             mediaProjection = null
+            projectionCallback = null
             stopSelf()
         }
     }
@@ -251,8 +303,10 @@ class ScreenRecordService : Service() {
             mediaRecorder = null
             virtualDisplay?.release()
             virtualDisplay = null
+            projectionCallback?.let { mediaProjection?.unregisterCallback(it) }
             mediaProjection?.stop()
             mediaProjection = null
+            projectionCallback = null
             isRecording = false
             isPaused = false
 

@@ -60,8 +60,16 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
             buildAndShowPanel()
             android.util.Log.i("FloatingPanelModule", "Panel shown successfully")
             promise.resolve(null)
+        } catch (e: WindowManager.BadTokenException) {
+            // Overlay permission looked granted but the OS refused to attach the
+            // window (can happen right after the user grants the permission,
+            // before the app process re-syncs). Never let this crash recording.
+            android.util.Log.e("FloatingPanelModule", "BadTokenException adding overlay window", e)
+            floatingView = null
+            promise.reject("PANEL_ERROR", "Kontrol paneli eklenemedi, izin ayarını tekrar kontrol edin.")
         } catch (e: Exception) {
             android.util.Log.e("FloatingPanelModule", "Error showing panel", e)
+            floatingView = null
             promise.reject("PANEL_ERROR", "Panel gösterilemedi: ${e.message}")
         }
     }
