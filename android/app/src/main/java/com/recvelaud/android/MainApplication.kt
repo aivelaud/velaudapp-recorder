@@ -42,7 +42,6 @@ class MainApplication : Application(), ReactApplication {
 
             override fun getUseDeveloperSupport(): Boolean = BuildConfig.DEBUG
 
-            override val isNewArchEnabled: Boolean = false  // New Arch kapalı — StatusBarManager crash fix
             override val isHermesEnabled: Boolean = true
         }
 
@@ -56,9 +55,9 @@ class MainApplication : Application(), ReactApplication {
 
         super.onCreate()
         SoLoader.init(this, false)
-        if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
-            load()
-        }
+        // RN 0.74: load() her zaman çağrılmalı — codegen'ın ürettiği C++ TurboModule'ları
+        // (StatusBarManager dahil) kayıt eder. Çağrılmazsa TurboModule registry boş kalır → crash.
+        load()
         // Initialize AdMob SDK. Wrapped in try-catch so that any AdMob
         // initialisation failure does not crash the whole app at startup.
         try {
