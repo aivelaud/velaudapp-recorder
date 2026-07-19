@@ -256,6 +256,14 @@ class ScreenRecordService : Service() {
         }
     }
 
+    fun isRecordingActive(): Boolean = isRecording
+
+    fun isPausedState(): Boolean = isPaused
+
+    fun getCurrentDuration(): Double = getDurationMs().toDouble()
+
+    fun getOutputPath(): String? = outputFilePath
+
     private fun getDurationMs(): Long {
         val elapsed = System.currentTimeMillis() - startTimeMs - pausedDurationMs
         return if (isPaused) (pauseStartMs - startTimeMs - pausedDurationMs) else elapsed

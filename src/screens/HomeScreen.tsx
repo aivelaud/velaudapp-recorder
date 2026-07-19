@@ -97,18 +97,27 @@ export default function HomeScreen() {
 
   const handleStartRecording = useCallback(async () => {
     try {
-      // 1. Overlay permission for floating panel
+      // 1. Check overlay permission for floating panel
       const overlayOk = await FloatingPanel.checkOverlayPermission();
       if (!overlayOk) {
         Alert.alert(
-          'Ekran Üstü İzni',
-          'Kayıt sırasında kayan panel için "Diğer uygulamaların üzerinde göster" iznine ihtiyaç var.',
+          'Gerekli İzin',
+          'Kayıt sırasında ekran üzerinde kontrol paneli göstermek için "Diğer uygulamaların üzerinde göster" iznine ihtiyaç var.\n\nBu izin olmadan kayıt yapamaz ve kontrolleri göremezsiniz.',
           [
-            {text: 'İzin Ver', onPress: () => FloatingPanel.requestOverlayPermission()},
-            {text: 'Atla'},
+            {
+              text: 'Ayarlara Git',
+              onPress: async () => {
+                await FloatingPanel.requestOverlayPermission();
+                ToastAndroid.show(
+                  'Lütfen izni verin ve geri gelin',
+                  ToastAndroid.LONG,
+                );
+              },
+            },
+            {text: 'İptal', style: 'cancel'},
           ],
         );
-        // Allow continuing without overlay permission
+        return;
       }
 
       // 2. Audio permission
@@ -131,16 +140,19 @@ export default function HomeScreen() {
 
       const started = await Recorder.startRecording(config);
       if (!started) {
-        ToastAndroid.show('Kayıt başlatılamadı. İzin reddedildi.', ToastAndroid.LONG);
+        Alert.alert(
+          'Kayıt Başlatılamadı',
+          'Ekran kaydı izni reddedildi. Kayıt yapmak için izin vermeniz gerekiyor.',
+        );
         return;
       }
 
       // 4. Show floating panel
-      if (overlayOk) {
-        await FloatingPanel.showPanel();
-      }
+      await FloatingPanel.showPanel();
+      ToastAndroid.show('Kayıt başladı!', ToastAndroid.SHORT);
     } catch (e: any) {
-      Alert.alert('Hata', e?.message ?? 'Kayıt başlatılamadı.');
+      console.error('Recording start error:', e);
+      Alert.alert('Kayıt Hatası', e?.message ?? 'Bilinmeyen bir hata oluştu.');
     }
   }, [settings]);
 

@@ -44,20 +44,25 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun showPanel(promise: Promise) {
-        if (!Settings.canDrawOverlays(reactContext)) {
-            promise.reject("NO_PERMISSION", "SYSTEM_ALERT_WINDOW permission not granted")
-            return
-        }
-        if (floatingView != null) {
-            promise.resolve(null)
-            return
-        }
         try {
+            if (!Settings.canDrawOverlays(reactContext)) {
+                android.util.Log.w("FloatingPanelModule", "Overlay permission not granted, requesting...")
+                // Don't reject immediately - panel will be shown after user grants permission
+                promise.resolve(null)
+                return
+            }
+            if (floatingView != null) {
+                android.util.Log.d("FloatingPanelModule", "Panel already showing")
+                promise.resolve(null)
+                return
+            }
             windowManager = reactContext.getSystemService(android.content.Context.WINDOW_SERVICE) as WindowManager
             buildAndShowPanel()
+            android.util.Log.i("FloatingPanelModule", "Panel shown successfully")
             promise.resolve(null)
         } catch (e: Exception) {
-            promise.reject("PANEL_ERROR", e.message)
+            android.util.Log.e("FloatingPanelModule", "Error showing panel", e)
+            promise.reject("PANEL_ERROR", "Panel gösterilemedi: ${e.message}")
         }
     }
 

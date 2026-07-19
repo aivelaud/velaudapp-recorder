@@ -150,22 +150,55 @@ class RecorderModule(private val reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun getStatus(promise: Promise) {
-        promise.resolve(Arguments.createMap().apply {
-            putBoolean("isRecording", false)
-            putBoolean("isPaused", false)
-            putDouble("duration", 0.0)
-            putString("filePath", "")
-        })
+        try {
+            val svc = recordService
+            if (svc != null) {
+                promise.resolve(Arguments.createMap().apply {
+                    putBoolean("isRecording", svc.isRecordingActive())
+                    putBoolean("isPaused", svc.isPausedState())
+                    putDouble("duration", svc.getCurrentDuration())
+                    putString("filePath", svc.getOutputPath() ?: "")
+                })
+            } else {
+                promise.resolve(Arguments.createMap().apply {
+                    putBoolean("isRecording", false)
+                    putBoolean("isPaused", false)
+                    putDouble("duration", 0.0)
+                    putString("filePath", "")
+                })
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "getStatus error", e)
+            promise.reject("STATUS_ERROR", e.message)
+        }
     }
 
     @ReactMethod
     fun checkPermissions(promise: Promise) {
-        promise.resolve(true)
+        val activity = currentActivity
+        if (activity == null) {
+            promise.resolve(false)
+            return
+        }
+        // Check overlay permission
+        val overlayGranted = android.provider.Settings.canDrawOverlays(reactApplicationContext)
+        promise.resolve(overlayGranted)
     }
 
     @ReactMethod
     fun requestPermissions(promise: Promise) {
-        promise.resolve(true)
+        val activity = currentActivity
+        if (activity == null) {
+            promise.reject("NO_ACTIVITY", "Activity not available")
+            return
+        }
+        // Request overlay permission
+        val intent = android.content.Intent(
+            android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+            android.net.Uri.parse("package:${reactApplicationContext.packageName}")
+        ).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
+        reactApplicationContext.startActivity(intent)
+        promise.resolve(null)
     }
 
     @ReactMethod
