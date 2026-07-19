@@ -100,8 +100,16 @@ class ScreenRecordService : Service() {
         val fps = intent.getIntExtra(EXTRA_FPS, 30)
         val includeAudio = intent.getBooleanExtra(EXTRA_INCLUDE_AUDIO, true)
 
+        if (resultCode == -1) {
+            Log.e(TAG, "Invalid result code for MediaProjection")
+            emitError("Geçersiz kayıt izni")
+            stopSelf()
+            return
+        }
+        
         if (resultData == null) {
             Log.e(TAG, "No result data for MediaProjection")
+            emitError("Kayıt izni verisi bulunamadı")
             stopSelf()
             return
         }
@@ -112,6 +120,13 @@ class ScreenRecordService : Service() {
         try {
             val projManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjection = projManager.getMediaProjection(resultCode, resultData)
+            
+            if (mediaProjection == null) {
+                Log.e(TAG, "MediaProjection is null after creation")
+                emitError("Ekran kaydı başlatılamadı")
+                stopSelf()
+                return
+            }
 
             // Set up MediaRecorder
             mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -122,48 +137,58 @@ class ScreenRecordService : Service() {
             }
 
             mediaRecorder?.apply {
-                if (includeAudio) {
-                    setAudioSource(MediaRecorder.AudioSource.MIC)
-                }
-                setVideoSource(MediaRecorder.VideoSource.SURFACE)
-                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-
-                // Output file via MediaStore (scoped storage)
-                val fileName = "VelaudRec_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())}.mp4"
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    val values = ContentValues().apply {
-                        put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
-                        put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-                        put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/VelaudRecorder")
-                        put(MediaStore.Video.Media.IS_PENDING, 1)
+                try {
+                    if (includeAudio) {
+                        setAudioSource(MediaRecorder.AudioSource.MIC)
                     }
-                    val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
-                    outputFilePath = uri?.toString() ?: ""
-                    if (uri != null) {
+                    setVideoSource(MediaRecorder.VideoSource.SURFACE)
+                    setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+
+                    // Output file via MediaStore (scoped storage)
+                    val fileName = "VelaudRec_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())}.mp4"
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val values = ContentValues().apply {
+                            put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
+                            put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+                            put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/VelaudRecorder")
+                            put(MediaStore.Video.Media.IS_PENDING, 1)
+                        }
+                        val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+                        if (uri == null) {
+                            throw Exception("MediaStore URI oluşturulamadı")
+                        }
+                        outputFilePath = uri.toString()
                         contentResolver.openFileDescriptor(uri, "w")?.use { pfd ->
                             setOutputFile(pfd.fileDescriptor)
+                        } ?: throw Exception("FileDescriptor açılamadı")
+                    } else {
+                        val dir = android.os.Environment.getExternalStoragePublicDirectory(
+                            android.os.Environment.DIRECTORY_MOVIES
+                        ).resolve("VelaudRecorder").also { 
+                            if (!it.exists() && !it.mkdirs()) {
+                                throw Exception("Kayıt klasörü oluşturulamadı")
+                            }
                         }
+                        val file = dir.resolve(fileName)
+                        outputFilePath = file.absolutePath
+                        setOutputFile(outputFilePath)
                     }
-                } else {
-                    val dir = android.os.Environment.getExternalStoragePublicDirectory(
-                        android.os.Environment.DIRECTORY_MOVIES
-                    ).resolve("VelaudRecorder").also { it.mkdirs() }
-                    val file = dir.resolve(fileName)
-                    outputFilePath = file.absolutePath
-                    setOutputFile(outputFilePath)
-                }
 
-                setVideoEncoder(MediaRecorder.VideoEncoder.H264)
-                if (includeAudio) {
-                    setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                    setAudioEncodingBitRate(128_000)
-                    setAudioSamplingRate(44100)
+                    setVideoEncoder(MediaRecorder.VideoEncoder.H264)
+                    if (includeAudio) {
+                        setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                        setAudioEncodingBitRate(128_000)
+                        setAudioSamplingRate(44100)
+                    }
+                    setVideoEncodingBitRate(8_000_000)
+                    setVideoFrameRate(fps)
+                    setVideoSize(width, height)
+                    prepare()
+                } catch (e: Exception) {
+                    Log.e(TAG, "MediaRecorder setup failed", e)
+                    throw e
                 }
-                setVideoEncodingBitRate(8_000_000)
-                setVideoFrameRate(fps)
-                setVideoSize(width, height)
-                prepare()
             }
 
             // Create VirtualDisplay
@@ -174,6 +199,10 @@ class ScreenRecordService : Service() {
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                 mediaRecorder?.surface, null, null
             )
+            
+            if (virtualDisplay == null) {
+                throw Exception("VirtualDisplay oluşturulamadı")
+            }
 
             mediaRecorder?.start()
             isRecording = true
@@ -185,10 +214,27 @@ class ScreenRecordService : Service() {
             startDurationTimer()
             emitStatus()
 
-            Log.i(TAG, "Recording started → $outputFilePath")
+            Log.i(TAG, "Recording started successfully → $outputFilePath")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start recording", e)
-            emitError(e.message ?: "Bilinmeyen hata")
+            val errorMsg = when {
+                e.message?.contains("prepare") == true -> "MediaRecorder hazırlanamadı"
+                e.message?.contains("permission") == true -> "Gerekli izinler verilmemiş"
+                e.message?.contains("MediaStore") == true -> "Video dosyası oluşturulamadı"
+                else -> e.message ?: "Bilinmeyen hata"
+            }
+            emitError(errorMsg)
+            
+            // Cleanup on error
+            try {
+                mediaRecorder?.release()
+                virtualDisplay?.release()
+                mediaProjection?.stop()
+            } catch (_: Exception) {}
+            
+            mediaRecorder = null
+            virtualDisplay = null
+            mediaProjection = null
             stopSelf()
         }
     }
@@ -333,21 +379,42 @@ class ScreenRecordService : Service() {
 
     private fun buildNotification(text: String): Notification {
         val stopIntent = Intent(this, ScreenRecordService::class.java).apply { action = ACTION_STOP }
-        val stopPending = PendingIntent.getService(this, 0, stopIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val stopPending = PendingIntent.getService(
+            this, 0, stopIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 
-        val openIntent = Intent(this, MainActivity::class.java)
-        val openPending = PendingIntent.getActivity(this, 0, openIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val pauseIntent = Intent(this, ScreenRecordService::class.java).apply { 
+            action = if (isPaused) ACTION_RESUME else ACTION_PAUSE 
+        }
+        val pausePending = PendingIntent.getService(
+            this, 1, pauseIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val openIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val openPending = PendingIntent.getActivity(
+            this, 0, openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val pauseLabel = if (isPaused) "Devam Et" else "Duraklat"
+        val pauseIcon = if (isPaused) android.R.drawable.ic_media_play else android.R.drawable.ic_media_pause
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Velaud Recorder")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentIntent(openPending)
-            .addAction(android.R.drawable.ic_media_pause, "Durdur", stopPending)
+            .addAction(pauseIcon, pauseLabel, pausePending)
+            .addAction(android.R.drawable.ic_delete, "Durdur", stopPending)
             .setOngoing(true)
             .setColor(0xE53935.toInt())
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .build()
     }
 

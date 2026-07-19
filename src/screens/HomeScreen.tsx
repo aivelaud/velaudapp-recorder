@@ -260,7 +260,7 @@ export default function HomeScreen() {
       </View>
 
       {/* Build info — small, unobtrusive, helps identify which APK is installed */}
-      <Text style={styles.buildInfo}>v1.0.2 (build 3)</Text>
+      <Text style={styles.buildInfo}>v1.0.9 (build 10)</Text>
     </SafeAreaView>
   );
 }

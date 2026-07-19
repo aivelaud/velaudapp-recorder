@@ -148,35 +148,46 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
     private fun buildPill(ctx: android.content.Context): View {
         val pill = FrameLayout(ctx)
         val bg = GradientDrawable().apply {
-            setColor(Color.parseColor("#CC1A1A1A"))
-            cornerRadius = 40f
+            setColor(Color.parseColor("#E0E53935"))
+            cornerRadius = 50f
+            setStroke(3, Color.parseColor("#FFFFFFFF"))
         }
         pill.background = bg
 
         val dot = View(ctx).apply {
             val dotBg = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#E53935"))
+                setColor(Color.parseColor("#FFFFFF"))
             }
             background = dotBg
         }
-        val dotSize = 18.dp(ctx)
+        val dotSize = 14.dp(ctx)
         val dotParams = FrameLayout.LayoutParams(dotSize, dotSize).apply {
             gravity = Gravity.CENTER
-            setMargins(12.dp(ctx), 8.dp(ctx), 12.dp(ctx), 8.dp(ctx))
+            setMargins(16.dp(ctx), 10.dp(ctx), 16.dp(ctx), 10.dp(ctx))
         }
         pill.addView(dot, dotParams)
+        
+        // Add pulsing animation to the dot
+        android.animation.ObjectAnimator.ofFloat(dot, "alpha", 1f, 0.3f).apply {
+            duration = 800
+            repeatCount = android.animation.ObjectAnimator.INFINITE
+            repeatMode = android.animation.ObjectAnimator.REVERSE
+            start()
+        }
+        
         return pill
     }
 
     private fun buildExpandedPanel(ctx: android.content.Context): View {
         val panel = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(16.dp(ctx), 12.dp(ctx), 16.dp(ctx), 12.dp(ctx))
+            setPadding(20.dp(ctx), 16.dp(ctx), 20.dp(ctx), 16.dp(ctx))
         }
         val bg = GradientDrawable().apply {
-            setColor(Color.parseColor("#E0141414"))
-            cornerRadius = 16f
+            setColor(Color.parseColor("#F0E53935"))
+            cornerRadius = 20f
+            setStroke(3, Color.parseColor("#FFFFFFFF"))
         }
         panel.background = bg
 
@@ -184,8 +195,10 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
         val durationTv = TextView(ctx).apply {
             text = "00:00:00"
             setTextColor(Color.WHITE)
-            textSize = 18f
+            textSize = 22f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 12.dp(ctx))
         }
         panel.addView(durationTv)
 
@@ -194,13 +207,13 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
-        val pauseBtn = buildPanelButton(ctx, "⏸") {
+        val pauseBtn = buildPanelButton(ctx, "⏸", "Pause") {
             val intent = Intent(ctx, ScreenRecordService::class.java).apply {
                 action = ScreenRecordService.ACTION_PAUSE
             }
             ctx.startService(intent)
         }
-        val stopBtn = buildPanelButton(ctx, "⏹") {
+        val stopBtn = buildPanelButton(ctx, "⏹", "Stop") {
             val intent = Intent(ctx, ScreenRecordService::class.java).apply {
                 action = ScreenRecordService.ACTION_STOP
             }
@@ -208,21 +221,49 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
             removePanel()
         }
         row.addView(pauseBtn)
+        
+        // Add spacing between buttons
+        val spacer = View(ctx).apply {
+            layoutParams = LinearLayout.LayoutParams(12.dp(ctx), 1)
+        }
+        row.addView(spacer)
+        
         row.addView(stopBtn)
         panel.addView(row)
         return panel
     }
 
-    private fun buildPanelButton(ctx: android.content.Context, label: String, onClick: () -> Unit): View {
-        val tv = TextView(ctx).apply {
-            text = label
-            textSize = 22f
-            setTextColor(Color.WHITE)
+    private fun buildPanelButton(ctx: android.content.Context, icon: String, label: String, onClick: () -> Unit): View {
+        val btn = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(18.dp(ctx), 10.dp(ctx), 18.dp(ctx), 10.dp(ctx))
+            setPadding(16.dp(ctx), 12.dp(ctx), 16.dp(ctx), 12.dp(ctx))
+            val btnBg = GradientDrawable().apply {
+                setColor(Color.parseColor("#FFFFFF"))
+                cornerRadius = 12f
+            }
+            background = btnBg
             setOnClickListener { onClick() }
         }
-        return tv
+        
+        val iconTv = TextView(ctx).apply {
+            text = icon
+            textSize = 24f
+            setTextColor(Color.parseColor("#E53935"))
+            gravity = Gravity.CENTER
+        }
+        btn.addView(iconTv)
+        
+        val labelTv = TextView(ctx).apply {
+            text = label
+            textSize = 11f
+            setTextColor(Color.parseColor("#666666"))
+            gravity = Gravity.CENTER
+            setPadding(0, 4.dp(ctx), 0, 0)
+        }
+        btn.addView(labelTv)
+        
+        return btn
     }
 
     private fun removePanel() {
