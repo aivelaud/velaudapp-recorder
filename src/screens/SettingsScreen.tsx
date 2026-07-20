@@ -6,7 +6,6 @@ import {
   Switch,
   TouchableOpacity,
   ScrollView,
-  Alert,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Colors} from '../theme/colors';
@@ -34,64 +33,84 @@ export default function SettingsScreen() {
     await SettingsManager.save(patch);
   };
 
-  const resolutions: {label: string; value: ResolutionOption}[] = [
-    {label: '720p (HD)', value: '720p'},
-    {label: '1080p (Full HD)', value: '1080p'},
-    {label: 'Cihaz Çözünürlüğü', value: 'device'},
+  const resolutions: {label: string; desc: string; value: ResolutionOption}[] = [
+    {label: '720p', desc: 'HD • Küçük dosya boyutu', value: '720p'},
+    {label: '1080p', desc: 'Full HD • Önerilen', value: '1080p'},
+    {label: 'Cihaz', desc: 'Cihaz çözünürlüğü', value: 'device'},
   ];
 
-  const fpsOptions: {label: string; value: FpsOption}[] = [
-    {label: '30 FPS (Akıcı, Küçük Dosya)', value: 30},
-    {label: '60 FPS (Çok Akıcı)', value: 60},
+  const fpsOptions: {label: string; desc: string; value: FpsOption}[] = [
+    {label: '30 FPS', desc: 'Standart • Küçük dosya', value: 30},
+    {label: '60 FPS', desc: 'Ultra akıcı • Büyük dosya', value: 60},
   ];
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Resolution */}
+        <Text style={styles.sectionHeader}>VIDEO KALİTESİ</Text>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Çözünürlük</Text>
-          {resolutions.map(opt => (
-            <TouchableOpacity
-              key={opt.value}
-              style={[styles.optionRow, settings.resolution === opt.value && styles.optionRowSelected]}
-              onPress={() => update({resolution: opt.value})}>
-              <Text style={[styles.optionText, settings.resolution === opt.value && styles.optionTextSelected]}>
-                {opt.label}
-              </Text>
-              <View style={[styles.radio, settings.resolution === opt.value && styles.radioSelected]}>
-                {settings.resolution === opt.value && <View style={styles.radioDot} />}
-              </View>
-            </TouchableOpacity>
-          ))}
+          <View style={styles.optionsGrid}>
+            {resolutions.map(opt => (
+              <TouchableOpacity
+                key={opt.value}
+                style={[
+                  styles.optionCard,
+                  settings.resolution === opt.value && styles.optionCardSelected,
+                ]}
+                onPress={() => update({resolution: opt.value})}>
+                <Text style={[
+                  styles.optionLabel,
+                  settings.resolution === opt.value && styles.optionLabelSelected,
+                ]}>
+                  {opt.label}
+                </Text>
+                <Text style={styles.optionDesc}>{opt.desc}</Text>
+                {settings.resolution === opt.value && (
+                  <View style={styles.checkMark}>
+                    <Text style={styles.checkText}>✓</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {/* FPS */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>FPS (Kare Hızı)</Text>
-          {fpsOptions.map(opt => (
-            <TouchableOpacity
-              key={opt.value}
-              style={[styles.optionRow, settings.fps === opt.value && styles.optionRowSelected]}
-              onPress={() => update({fps: opt.value})}>
-              <Text style={[styles.optionText, settings.fps === opt.value && styles.optionTextSelected]}>
-                {opt.label}
-              </Text>
-              <View style={[styles.radio, settings.fps === opt.value && styles.radioSelected]}>
-                {settings.fps === opt.value && <View style={styles.radioDot} />}
-              </View>
-            </TouchableOpacity>
-          ))}
+          <Text style={styles.sectionTitle}>Kare Hızı</Text>
+          <View style={styles.optionsRow}>
+            {fpsOptions.map(opt => (
+              <TouchableOpacity
+                key={opt.value}
+                style={[
+                  styles.fpsCard,
+                  settings.fps === opt.value && styles.fpsCardSelected,
+                ]}
+                onPress={() => update({fps: opt.value})}>
+                <Text style={[
+                  styles.fpsLabel,
+                  settings.fps === opt.value && styles.fpsLabelSelected,
+                ]}>
+                  {opt.label}
+                </Text>
+                <Text style={styles.fpsDesc}>{opt.desc}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
-        {/* Toggles */}
+        {/* Audio & Touch */}
+        <Text style={styles.sectionHeader}>KAYIT SEÇENEKLERİ</Text>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Kayıt Seçenekleri</Text>
-
           <View style={styles.toggleRow}>
-            <View style={styles.toggleInfo}>
-              <Text style={styles.toggleLabel}>Ses Kayıt (Mikrofon)</Text>
-              <Text style={styles.toggleDesc}>Kayıt sırasında mikrofon sesini dahil et</Text>
+            <View style={styles.toggleLeft}>
+              <Text style={styles.toggleEmoji}>🎙️</Text>
+              <View style={styles.toggleInfo}>
+                <Text style={styles.toggleLabel}>Ses Kaydı</Text>
+                <Text style={styles.toggleDesc}>Mikrofon sesini dahil et</Text>
+              </View>
             </View>
             <Switch
               value={settings.includeAudio}
@@ -101,12 +120,15 @@ export default function SettingsScreen() {
             />
           </View>
 
+          <View style={styles.divider} />
+
           <View style={styles.toggleRow}>
-            <View style={styles.toggleInfo}>
-              <Text style={styles.toggleLabel}>Dokunma Göstergesi</Text>
-              <Text style={styles.toggleDesc}>
-                Ekrana dokunulduğunda küçük bir daire göster (tutorial kayıtları için)
-              </Text>
+            <View style={styles.toggleLeft}>
+              <Text style={styles.toggleEmoji}>👆</Text>
+              <View style={styles.toggleInfo}>
+                <Text style={styles.toggleLabel}>Dokunma Göstergesi</Text>
+                <Text style={styles.toggleDesc}>Ekrana dokunulduğunda göster</Text>
+              </View>
             </View>
             <Switch
               value={settings.showTouches}
@@ -117,28 +139,28 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Save Folder Info */}
+        {/* Storage Info */}
+        <Text style={styles.sectionHeader}>DEPOLAMA</Text>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Kayıt Klasörü</Text>
-          <View style={styles.infoBox}>
-            <Text style={styles.infoLabel}>Kayıtlar nereye kaydedilir?</Text>
-            <Text style={styles.infoValue}>/{settings.saveFolder}</Text>
-            <Text style={styles.infoDesc}>
-              Tüm kayıtlar cihazınızda yerel olarak saklanır. Hiçbir sunucuya yüklenmez.
-            </Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoEmoji}>📁</Text>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Kayıt Konumu</Text>
+              <Text style={styles.infoValue}>/{settings.saveFolder}</Text>
+              <Text style={styles.infoDesc}>
+                Tüm kayıtlar cihazınızda yerel olarak saklanır
+              </Text>
+            </View>
           </View>
         </View>
 
-        {/* App Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Uygulama Hakkında</Text>
-          <View style={styles.infoBox}>
-            <Text style={styles.infoLabel}>Velaud Recorder</Text>
-            <Text style={styles.infoValue}>v1.0.0</Text>
-            <Text style={styles.infoDesc}>
-              Reklamsız, gizlilik odaklı Android ekran kaydedici.
-            </Text>
-          </View>
+        {/* About */}
+        <View style={styles.aboutSection}>
+          <Text style={styles.aboutTitle}>Velaud Recorder</Text>
+          <Text style={styles.aboutVersion}>v2.0.0 (build 11)</Text>
+          <Text style={styles.aboutDesc}>
+            Profesyonel ekran kaydedici • Gizlilik odaklı
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -147,69 +169,181 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: {flex: 1, backgroundColor: Colors.background},
-  content: {padding: 16, paddingBottom: 40},
+  content: {padding: 20, paddingBottom: 40},
+  sectionHeader: {
+    color: Colors.textMuted,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 2,
+    marginBottom: 10,
+    marginTop: 8,
+    paddingLeft: 4,
+  },
   section: {
     backgroundColor: Colors.surface,
-    borderRadius: 12,
-    marginBottom: 16,
-    overflow: 'hidden',
+    borderRadius: 16,
+    marginBottom: 20,
+    padding: 16,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   sectionTitle: {
-    color: Colors.textSecondary,
-    fontSize: 12,
+    color: Colors.text,
+    fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    marginBottom: 14,
   },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+  optionsGrid: {
+    gap: 10,
   },
-  optionRowSelected: {backgroundColor: 'rgba(229,57,53,0.06)'},
-  optionText: {color: Colors.textSecondary, fontSize: 15},
-  optionTextSelected: {color: Colors.text, fontWeight: '600'},
-  radio: {
+  optionCard: {
+    flexDirection: 'column',
+    backgroundColor: Colors.surfaceElevated,
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    position: 'relative',
+  },
+  optionCardSelected: {
+    borderColor: Colors.primary,
+    backgroundColor: 'rgba(108, 99, 255, 0.08)',
+  },
+  optionLabel: {
+    color: Colors.textSecondary,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  optionLabelSelected: {
+    color: Colors.primary,
+  },
+  optionDesc: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  checkMark: {
+    position: 'absolute',
+    top: 12,
+    right: 14,
     width: 22,
     height: 22,
     borderRadius: 11,
-    borderWidth: 2,
-    borderColor: Colors.border,
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  radioSelected: {borderColor: Colors.primary},
-  radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: Colors.primary,
+  checkText: {
+    color: Colors.white,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  optionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  fpsCard: {
+    flex: 1,
+    backgroundColor: Colors.surfaceElevated,
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    alignItems: 'center',
+  },
+  fpsCardSelected: {
+    borderColor: Colors.primary,
+    backgroundColor: 'rgba(108, 99, 255, 0.08)',
+  },
+  fpsLabel: {
+    color: Colors.textSecondary,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  fpsLabelSelected: {
+    color: Colors.primary,
+  },
+  fpsDesc: {
+    color: Colors.textMuted,
+    fontSize: 11,
+    marginTop: 4,
+    textAlign: 'center',
   },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  toggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
     gap: 12,
   },
+  toggleEmoji: {
+    fontSize: 24,
+  },
   toggleInfo: {flex: 1},
-  toggleLabel: {color: Colors.text, fontSize: 15, fontWeight: '500', marginBottom: 2},
-  toggleDesc: {color: Colors.textMuted, fontSize: 12, lineHeight: 16},
-  infoBox: {padding: 16},
-  infoLabel: {color: Colors.textSecondary, fontSize: 13, marginBottom: 4},
-  infoValue: {color: Colors.text, fontSize: 16, fontWeight: '700', marginBottom: 6},
-  infoDesc: {color: Colors.textMuted, fontSize: 13, lineHeight: 18},
+  toggleLabel: {
+    color: Colors.text,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  toggleDesc: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginVertical: 14,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  infoEmoji: {
+    fontSize: 24,
+    marginTop: 2,
+  },
+  infoContent: {flex: 1},
+  infoLabel: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  infoValue: {
+    color: Colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  infoDesc: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    marginTop: 4,
+  },
+  aboutSection: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  aboutTitle: {
+    color: Colors.text,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  aboutVersion: {
+    color: Colors.primary,
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  aboutDesc: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    marginTop: 6,
+  },
 });

@@ -10,6 +10,7 @@ import {
   Image,
   ActivityIndicator,
   RefreshControl,
+  ToastAndroid,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Colors} from '../theme/colors';
@@ -17,32 +18,35 @@ import {VideoLibrary, VideoItem} from '../modules/VideoLibraryModule';
 
 const formatDuration = (ms: number): string => {
   const totalSec = Math.floor(ms / 1000);
-  const m = Math.floor(totalSec / 60);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   return `${m}:${String(s).padStart(2, '0')}`;
 };
 
 const formatSize = (bytes: number): string => {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 };
 
 const formatDate = (timestamp: number): string => {
   const d = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+
+  if (diffHours < 1) return 'Az önce';
+  if (diffHours < 24) return `${Math.floor(diffHours)} saat önce`;
+  if (diffHours < 48) return 'Dün';
+
   return `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1)
     .toString()
-    .padStart(2, '0')}.${d.getFullYear()} ${d
-    .getHours()
-    .toString()
-    .padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+    .padStart(2, '0')}.${d.getFullYear()}`;
 };
 
 function VideoCard({item, onDelete}: {item: VideoItem; onDelete: (item: VideoItem) => void}) {
-  const handlePlay = () => {
-    // Intent.ACTION_VIEW — handled by native side if we had a module, or use react-native-video
-    Alert.alert('Video Oynat', `"${item.displayName}" oynatılıyor…\n(Sistem video oynatıcı açılıyor)`);
-  };
-
   const handleShare = async () => {
     try {
       await Share.share({
@@ -57,49 +61,62 @@ function VideoCard({item, onDelete}: {item: VideoItem; onDelete: (item: VideoIte
   const handleDelete = () => {
     Alert.alert(
       'Videoyu Sil',
-      `"${item.displayName}" kalıcı olarak silinecek. Emin misin?`,
+      `"${item.displayName}" kalıcı olarak silinecek.`,
       [
         {text: 'İptal', style: 'cancel'},
-        {text: 'Sil', style: 'destructive', onPress: () => onDelete(item)},
+        {
+          text: 'Sil',
+          style: 'destructive',
+          onPress: () => onDelete(item),
+        },
       ],
     );
   };
 
   return (
     <View style={styles.card}>
-      <View style={styles.thumbnail}>
+      {/* Thumbnail */}
+      <View style={styles.thumbnailContainer}>
         {item.thumbnailPath ? (
           <Image
             source={{uri: `file://${item.thumbnailPath}`}}
-            style={styles.thumbnailImg}
+            style={styles.thumbnail}
             resizeMode="cover"
           />
         ) : (
           <View style={styles.thumbnailPlaceholder}>
-            <View style={styles.playIconSmall} />
+            <Text style={styles.playIcon}>▶</Text>
           </View>
         )}
         <View style={styles.durationBadge}>
-          <Text style={styles.durationBadgeText}>{formatDuration(item.duration)}</Text>
+          <Text style={styles.durationText}>{formatDuration(item.duration)}</Text>
         </View>
       </View>
 
-      <View style={styles.cardInfo}>
-        <Text style={styles.videoTitle} numberOfLines={2}>
+      {/* Info */}
+      <View style={styles.cardContent}>
+        <Text style={styles.videoName} numberOfLines={1}>
           {item.displayName}
         </Text>
-        <Text style={styles.videoMeta}>{formatDate(item.dateAdded)}</Text>
-        <Text style={styles.videoSize}>{formatSize(item.size)}</Text>
+        <View style={styles.metaRow}>
+          <Text style={styles.metaText}>{formatDate(item.dateAdded)}</Text>
+          <Text style={styles.metaDot}>•</Text>
+          <Text style={styles.metaText}>{formatSize(item.size)}</Text>
+          {item.width > 0 && (
+            <>
+              <Text style={styles.metaDot}>•</Text>
+              <Text style={styles.metaText}>{item.width}×{item.height}</Text>
+            </>
+          )}
+        </View>
 
-        <View style={styles.actions}>
-          <TouchableOpacity style={[styles.actionBtn, styles.playBtn]} onPress={handlePlay}>
-            <Text style={styles.actionBtnText}>▶ Oynat</Text>
+        {/* Actions */}
+        <View style={styles.actionsRow}>
+          <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
+            <Text style={styles.shareBtnText}>📤 Paylaş</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, styles.shareBtn]} onPress={handleShare}>
-            <Text style={styles.actionBtnText}>Paylaş</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, styles.deleteBtn]} onPress={handleDelete}>
-            <Text style={styles.actionBtnText}>Sil</Text>
+          <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+            <Text style={styles.deleteBtnText}>🗑️</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -113,9 +130,13 @@ export default function VideosScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const loadVideos = useCallback(async () => {
-    const items = await VideoLibrary.getRecordedVideos();
-    items.sort((a, b) => b.dateAdded - a.dateAdded);
-    setVideos(items);
+    try {
+      const items = await VideoLibrary.getRecordedVideos();
+      items.sort((a, b) => b.dateAdded - a.dateAdded);
+      setVideos(items);
+    } catch (e) {
+      console.error('Load videos error:', e);
+    }
   }, []);
 
   useEffect(() => {
@@ -132,6 +153,7 @@ export default function VideosScreen() {
     const ok = await VideoLibrary.deleteVideo(item.filePath);
     if (ok) {
       setVideos(prev => prev.filter(v => v.id !== item.id));
+      ToastAndroid.show('Video silindi', ToastAndroid.SHORT);
     } else {
       Alert.alert('Hata', 'Video silinemedi.');
     }
@@ -139,17 +161,21 @@ export default function VideosScreen() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loadingText}>Videolar yükleniyor...</Text>
       </View>
     );
   }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Videolarım</Text>
-        <Text style={styles.videoCount}>{videos.length} video</Text>
+        <View style={styles.countBadge}>
+          <Text style={styles.countText}>{videos.length}</Text>
+        </View>
       </View>
 
       <FlatList
@@ -158,14 +184,22 @@ export default function VideosScreen() {
         renderItem={({item}) => <VideoCard item={item} onDelete={handleDelete} />}
         contentContainerStyle={videos.length === 0 ? styles.emptyContainer : styles.list}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.primary}
+            colors={[Colors.primary]}
+          />
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <View style={styles.emptyIcon} />
+            <View style={styles.emptyIconContainer}>
+              <Text style={styles.emptyEmoji}>🎬</Text>
+            </View>
             <Text style={styles.emptyTitle}>Henüz video yok</Text>
             <Text style={styles.emptySubtitle}>
-              Kayıt sekmesinden ekran kaydını başlatın.{'\n'}Kayıtlar burada görünecek.
+              Kayıt sekmesinden ekran kaydını başlatın.{'\n'}
+              Kayıtlarınız burada görünecek.
             </Text>
           </View>
         }
@@ -177,35 +211,59 @@ export default function VideosScreen() {
 
 const styles = StyleSheet.create({
   container: {flex: 1, backgroundColor: Colors.background},
-  center: {flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background},
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.background,
+    gap: 12,
+  },
+  loadingText: {
+    color: Colors.textMuted,
+    fontSize: 14,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    paddingVertical: 16,
+    gap: 10,
   },
-  headerTitle: {color: Colors.text, fontSize: 20, fontWeight: '700'},
-  videoCount: {color: Colors.textMuted, fontSize: 14},
-  list: {padding: 16, gap: 12},
+  headerTitle: {
+    color: Colors.text,
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  countBadge: {
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  countText: {
+    color: Colors.white,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  list: {padding: 16, paddingTop: 4},
   emptyContainer: {flex: 1},
   card: {
-    flexDirection: 'row',
     backgroundColor: Colors.surface,
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: Colors.border,
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  thumbnail: {
-    width: 110,
-    height: 110,
+  thumbnailContainer: {
+    width: '100%',
+    height: 160,
     position: 'relative',
   },
-  thumbnailImg: {width: '100%', height: '100%'},
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+  },
   thumbnailPlaceholder: {
     width: '100%',
     height: '100%',
@@ -213,55 +271,108 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  playIconSmall: {
-    width: 0,
-    height: 0,
-    borderTopWidth: 10,
-    borderBottomWidth: 10,
-    borderLeftWidth: 18,
-    borderTopColor: 'transparent',
-    borderBottomColor: 'transparent',
-    borderLeftColor: Colors.textMuted,
+  playIcon: {
+    fontSize: 32,
+    color: Colors.textMuted,
   },
   durationBadge: {
     position: 'absolute',
-    bottom: 6,
-    right: 6,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    borderRadius: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-  },
-  durationBadgeText: {color: Colors.white, fontSize: 11, fontWeight: '600'},
-  cardInfo: {flex: 1, padding: 12, justifyContent: 'space-between'},
-  videoTitle: {color: Colors.text, fontSize: 14, fontWeight: '600', lineHeight: 18},
-  videoMeta: {color: Colors.textMuted, fontSize: 12, marginTop: 2},
-  videoSize: {color: Colors.textMuted, fontSize: 12},
-  actions: {flexDirection: 'row', gap: 6, marginTop: 6},
-  actionBtn: {
-    flex: 1,
-    paddingVertical: 6,
+    bottom: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.8)',
     borderRadius: 6,
-    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
-  playBtn: {backgroundColor: Colors.primary},
-  shareBtn: {backgroundColor: Colors.surfaceElevated, borderWidth: 1, borderColor: Colors.border},
-  deleteBtn: {backgroundColor: 'transparent', borderWidth: 1, borderColor: Colors.error},
-  actionBtnText: {color: Colors.white, fontSize: 12, fontWeight: '600'},
+  durationText: {
+    color: Colors.white,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  cardContent: {
+    padding: 14,
+  },
+  videoName: {
+    color: Colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 6,
+  },
+  metaText: {
+    color: Colors.textMuted,
+    fontSize: 12,
+  },
+  metaDot: {
+    color: Colors.textMuted,
+    fontSize: 8,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 8,
+  },
+  shareBtn: {
+    flex: 1,
+    backgroundColor: Colors.surfaceElevated,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  shareBtnText: {
+    color: Colors.text,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  deleteBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    backgroundColor: 'rgba(248, 113, 113, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.error,
+  },
+  deleteBtnText: {
+    fontSize: 16,
+  },
   emptyState: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 80,
+    paddingVertical: 100,
     paddingHorizontal: 40,
   },
-  emptyIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: Colors.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 20,
   },
-  emptyTitle: {color: Colors.text, fontSize: 18, fontWeight: '700', marginBottom: 8},
-  emptySubtitle: {color: Colors.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 22},
+  emptyEmoji: {
+    fontSize: 36,
+  },
+  emptyTitle: {
+    color: Colors.text,
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    color: Colors.textMuted,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
 });

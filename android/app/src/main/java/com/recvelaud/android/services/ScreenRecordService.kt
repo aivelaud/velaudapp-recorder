@@ -19,13 +19,11 @@ import android.os.IBinder
 import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
-import android.view.WindowManager
 import androidx.core.app.NotificationCompat
+import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import com.recvelaud.android.MainActivity
-import com.recvelaud.android.R
-import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -79,10 +77,7 @@ class ScreenRecordService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Service can be killed by the system (low memory, task removed, etc.)
-        // without stopRecording() ever being called — release everything here
-        // too, otherwise MediaProjection/MediaRecorder/VirtualDisplay leak and
-        // the next recording attempt fails silently or crashes.
+        // Service can be killed by the system — release everything
         try {
             durationTimer?.cancel()
             durationTimer = null
@@ -117,7 +112,7 @@ class ScreenRecordService : Service() {
 
     private fun startRecording(intent: Intent) {
         if (isRecording) {
-            Log.w(TAG, "startRecording called while already recording — ignoring duplicate start")
+            Log.w(TAG, "startRecording called while already recording — ignoring")
             emitStatus()
             return
         }
@@ -148,7 +143,9 @@ class ScreenRecordService : Service() {
             return
         }
 
-        // Start foreground immediately
+        // CRITICAL: Start foreground IMMEDIATELY before any other work.
+        // On Android 12+ the system kills the service if startForeground()
+        // is not called within ~5 seconds of startForegroundService().
         startForeground(NOTIF_ID, buildNotification("Kayıt hazırlanıyor…"))
 
         try {
@@ -158,18 +155,16 @@ class ScreenRecordService : Service() {
             if (mediaProjection == null) {
                 Log.e(TAG, "MediaProjection is null after creation")
                 emitError("Ekran kaydı başlatılamadı")
+                stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 return
             }
 
-            // CRITICAL (Android 14 / API 34+ requirement): a MediaProjection.Callback
-            // MUST be registered before the projection is used to create a VirtualDisplay.
-            // Without this, the OS is allowed to invalidate the projection session at any
-            // time (e.g. the moment the app is backgrounded or another app comes to the
-            // foreground), which is exactly why recording other apps / background capture
-            // was silently failing. The callback also lets us react cleanly (stop the
-            // service, release the recorder) when the user stops the projection from the
-            // system "Stop casting" notification, instead of crashing.
+            // CRITICAL (Android 14 / API 34+): Register a MediaProjection.Callback
+            // BEFORE creating the VirtualDisplay. Without this, the OS can invalidate
+            // the projection session at any time (e.g. when the app is backgrounded
+            // or another app comes to the foreground). This is the PRIMARY fix for
+            // "recording doesn't work in background / other apps" bug.
             projectionCallback = object : MediaProjection.Callback() {
                 override fun onStop() {
                     Log.w(TAG, "MediaProjection.onStop() — projection revoked by system/user")
@@ -287,6 +282,7 @@ class ScreenRecordService : Service() {
             virtualDisplay = null
             mediaProjection = null
             projectionCallback = null
+            stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
     }
@@ -365,6 +361,7 @@ class ScreenRecordService : Service() {
     fun getOutputPath(): String? = outputFilePath
 
     private fun getDurationMs(): Long {
+        if (!isRecording) return 0L
         val elapsed = System.currentTimeMillis() - startTimeMs - pausedDurationMs
         return if (isPaused) (pauseStartMs - startTimeMs - pausedDurationMs) else elapsed
     }
@@ -382,11 +379,7 @@ class ScreenRecordService : Service() {
         val ctx = reactContext ?: return
         handler.post {
             try {
-                // Must use WritableNativeMap (not a plain Kotlin Map) — the RN bridge
-                // only knows how to serialise ReadableMap/WritableMap implementations
-                // to JavaScript; passing a raw kotlin.collections.Map causes a
-                // ClassCastException inside the bridge serialiser.
-                val payload = com.facebook.react.bridge.Arguments.createMap().apply {
+                val payload = Arguments.createMap().apply {
                     putBoolean("isRecording", isRecording)
                     putBoolean("isPaused", isPaused)
                     putDouble("duration", getDurationMs().toDouble())
@@ -465,7 +458,7 @@ class ScreenRecordService : Service() {
             .addAction(pauseIcon, pauseLabel, pausePending)
             .addAction(android.R.drawable.ic_delete, "Durdur", stopPending)
             .setOngoing(true)
-            .setColor(0xE53935.toInt())
+            .setColor(0xFF6C63FF.toInt())
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -475,10 +468,5 @@ class ScreenRecordService : Service() {
     private fun updateNotification(text: String) {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         nm.notify(NOTIF_ID, buildNotification(text))
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        if (isRecording) stopRecording()
     }
 }

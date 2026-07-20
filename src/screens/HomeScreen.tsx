@@ -9,6 +9,7 @@ import {
   Platform,
   PermissionsAndroid,
   ToastAndroid,
+  Dimensions,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
@@ -19,6 +20,8 @@ import {Recorder, FloatingPanel, RecordingStatus, RecordingConfig} from '../modu
 import {SettingsManager, AppSettings} from '../modules/SettingsManager';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
+
+const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
 const formatDuration = (ms: number): string => {
   const totalSec = Math.floor(ms / 1000);
@@ -42,18 +45,33 @@ export default function HomeScreen() {
     showTouches: false,
     saveFolder: 'Movies/VelaudRecorder',
   });
+  const [permissionChecked, setPermissionChecked] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
   const pulseLoop = useRef<Animated.CompositeAnimation | null>(null);
+  const glowLoop = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     SettingsManager.load().then(setSettings);
 
     const statusSub = Recorder.onRecordingStatus(s => setStatus(s));
-    const savedSub = Recorder.onRecordingSaved(filePath => {
-      ToastAndroid.show('Video kaydedildi!', ToastAndroid.SHORT);
+    const savedSub = Recorder.onRecordingSaved(_filePath => {
+      ToastAndroid.show('✅ Video başarıyla kaydedildi!', ToastAndroid.SHORT);
     });
     const errorSub = Recorder.onRecordingError(err => {
       Alert.alert('Kayıt Hatası', err);
+    });
+
+    // Check overlay permission on mount
+    FloatingPanel.checkOverlayPermission().then(granted => {
+      setPermissionChecked(true);
+      if (!granted) {
+        // Show a non-blocking toast
+        ToastAndroid.show(
+          'Ekran üstü izni gerekli - Ayarlardan verin',
+          ToastAndroid.LONG,
+        );
+      }
     });
 
     return () => {
@@ -67,17 +85,28 @@ export default function HomeScreen() {
     if (status.isRecording && !status.isPaused) {
       pulseLoop.current = Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseAnim, {toValue: 1.15, duration: 700, useNativeDriver: true}),
-          Animated.timing(pulseAnim, {toValue: 1, duration: 700, useNativeDriver: true}),
+          Animated.timing(pulseAnim, {toValue: 1.08, duration: 800, useNativeDriver: true}),
+          Animated.timing(pulseAnim, {toValue: 1, duration: 800, useNativeDriver: true}),
         ]),
       );
       pulseLoop.current.start();
+
+      glowLoop.current = Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, {toValue: 1, duration: 1000, useNativeDriver: true}),
+          Animated.timing(glowAnim, {toValue: 0.4, duration: 1000, useNativeDriver: true}),
+        ]),
+      );
+      glowLoop.current.start();
     } else {
       pulseLoop.current?.stop();
+      glowLoop.current?.stop();
       pulseAnim.setValue(1);
+      glowAnim.setValue(0);
     }
     return () => {
       pulseLoop.current?.stop();
+      glowLoop.current?.stop();
     };
   }, [status.isRecording, status.isPaused]);
 
@@ -87,7 +116,7 @@ export default function HomeScreen() {
       PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
       {
         title: 'Mikrofon İzni',
-        message: 'Ses kayıt için mikrofon izni gerekli.',
+        message: 'Ses kaydı için mikrofon erişimi gereklidir.',
         buttonPositive: 'İzin Ver',
         buttonNegative: 'Reddet',
       },
@@ -101,15 +130,15 @@ export default function HomeScreen() {
       const overlayOk = await FloatingPanel.checkOverlayPermission();
       if (!overlayOk) {
         Alert.alert(
-          'Gerekli İzin',
-          'Kayıt sırasında ekran üzerinde kontrol paneli göstermek için "Diğer uygulamaların üzerinde göster" iznine ihtiyaç var.\n\nBu izin olmadan kayıt yapamaz ve kontrolleri göremezsiniz.',
+          'Ekran Üstü İzni Gerekli',
+          'Kayıt sırasında kontrol panelini göstermek için "Diğer uygulamaların üzerinde göster" iznini vermeniz gerekiyor.\n\nBu izin olmadan kayıt başlatılamaz.',
           [
             {
               text: 'Ayarlara Git',
               onPress: async () => {
                 await FloatingPanel.requestOverlayPermission();
                 ToastAndroid.show(
-                  'Lütfen izni verin ve geri gelin',
+                  'İzni verdikten sonra geri dönün',
                   ToastAndroid.LONG,
                 );
               },
@@ -128,7 +157,7 @@ export default function HomeScreen() {
         }
       }
 
-      // 3. Start recording (shows MediaProjection dialog natively)
+      // 3. Start recording
       const dims = SettingsManager.getResolutionDimensions(settings.resolution);
       const config: RecordingConfig = {
         width: dims.width || undefined,
@@ -142,137 +171,180 @@ export default function HomeScreen() {
       if (!started) {
         Alert.alert(
           'Kayıt Başlatılamadı',
-          'Ekran kaydı izni reddedildi. Kayıt yapmak için izin vermeniz gerekiyor.',
+          'Ekran kaydı izni reddedildi veya başka bir hata oluştu.',
         );
         return;
       }
 
-      // 4. Show floating panel — this is a *secondary* UI convenience (lets the
-      // user pause/stop while inside another app). Recording itself already
-      // started via the foreground service above, so a panel failure here must
-      // NEVER be reported as "recording failed" — that was misleading users
-      // into thinking nothing was captured when the video was actually fine.
+      // 4. Show floating panel (non-blocking)
       try {
         await FloatingPanel.showPanel();
       } catch (panelErr: any) {
-        console.warn('Floating panel could not be shown:', panelErr);
+        console.warn('Floating panel error:', panelErr);
         ToastAndroid.show(
-          'Kayıt başladı, ancak kontrol paneli gösterilemedi. Durdurmak için bildirimi kullanabilirsiniz.',
+          'Kayıt başladı! Durdurmak için bildirim çubuğunu kullanın.',
           ToastAndroid.LONG,
         );
       }
-      ToastAndroid.show('Kayıt başladı!', ToastAndroid.SHORT);
+      ToastAndroid.show('🔴 Kayıt başladı!', ToastAndroid.SHORT);
     } catch (e: any) {
       console.error('Recording start error:', e);
-      Alert.alert('Kayıt Hatası', e?.message ?? 'Bilinmeyen bir hata oluştu.');
+      Alert.alert('Hata', e?.message ?? 'Bilinmeyen bir hata oluştu.');
     }
   }, [settings]);
 
   const handleStopRecording = useCallback(async () => {
-    await Recorder.stopRecording();
-    await FloatingPanel.hidePanel();
+    try {
+      await Recorder.stopRecording();
+      await FloatingPanel.hidePanel();
+      ToastAndroid.show('⏹ Kayıt durduruldu', ToastAndroid.SHORT);
+    } catch (e: any) {
+      console.error('Stop recording error:', e);
+    }
   }, []);
 
   const handlePauseResume = useCallback(async () => {
-    if (status.isPaused) {
-      await Recorder.resumeRecording();
-    } else {
-      await Recorder.pauseRecording();
+    try {
+      if (status.isPaused) {
+        await Recorder.resumeRecording();
+        ToastAndroid.show('▶ Kayıt devam ediyor', ToastAndroid.SHORT);
+      } else {
+        await Recorder.pauseRecording();
+        ToastAndroid.show('⏸ Kayıt duraklatıldı', ToastAndroid.SHORT);
+      }
+    } catch (e: any) {
+      console.error('Pause/Resume error:', e);
     }
   }, [status.isPaused]);
 
   const resolutionLabel =
-    settings.resolution === 'device' ? 'Cihaz Çözünürlüğü' : settings.resolution;
+    settings.resolution === 'device' ? 'Cihaz' : settings.resolution;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Velaud Recorder</Text>
+        <View style={styles.headerLeft}>
+          <View style={styles.logoContainer}>
+            <View style={styles.logoDot} />
+          </View>
+          <Text style={styles.headerTitle}>Velaud</Text>
+        </View>
         <TouchableOpacity
           style={styles.settingsBtn}
           onPress={() => navigation.navigate('Settings')}
-          hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-          <View style={styles.gearIcon} />
+          hitSlop={{top: 12, bottom: 12, left: 12, right: 12}}>
+          <Text style={styles.settingsIcon}>⚙️</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Settings Summary */}
-      <TouchableOpacity
-        style={styles.settingsSummary}
-        onPress={() => navigation.navigate('Settings')}>
-        <View style={styles.settingChip}>
-          <Text style={styles.settingChipText}>{resolutionLabel}</Text>
-        </View>
-        <View style={styles.settingChip}>
-          <Text style={styles.settingChipText}>{settings.fps} FPS</Text>
-        </View>
-        <View style={styles.settingChip}>
-          <View style={[styles.dot, {backgroundColor: settings.includeAudio ? Colors.success : Colors.error}]} />
-          <Text style={styles.settingChipText}>{settings.includeAudio ? 'Ses Açık' : 'Sessiz'}</Text>
-        </View>
-      </TouchableOpacity>
-
-      {/* Main Recording Button Area */}
-      <View style={styles.centerArea}>
-        {status.isRecording && (
-          <Text style={[styles.duration, {color: status.isPaused ? Colors.paused : Colors.recording}]}>
-            {formatDuration(status.duration)}
+      {/* Quick Settings Chips */}
+      <View style={styles.chipsRow}>
+        <TouchableOpacity
+          style={styles.chip}
+          onPress={() => navigation.navigate('Settings')}>
+          <Text style={styles.chipText}>📐 {resolutionLabel}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.chip}
+          onPress={() => navigation.navigate('Settings')}>
+          <Text style={styles.chipText}>🎬 {settings.fps} FPS</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.chip, settings.includeAudio ? styles.chipActive : styles.chipInactive]}
+          onPress={() => navigation.navigate('Settings')}>
+          <Text style={styles.chipText}>
+            {settings.includeAudio ? '🎙️ Ses Açık' : '🔇 Sessiz'}
           </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Main Content */}
+      <View style={styles.centerArea}>
+        {/* Duration Display */}
+        {status.isRecording && (
+          <View style={styles.durationContainer}>
+            <View style={[
+              styles.statusDot,
+              {backgroundColor: status.isPaused ? Colors.paused : Colors.recording},
+            ]} />
+            <Text style={[
+              styles.duration,
+              {color: status.isPaused ? Colors.paused : Colors.recording},
+            ]}>
+              {formatDuration(status.duration)}
+            </Text>
+          </View>
         )}
+
         {status.isRecording && (
           <Text style={styles.statusLabel}>
-            {status.isPaused ? '⏸  DURAKLATILDI' : '⏺  KAYIT YAPILIYOR'}
+            {status.isPaused ? 'DURAKLATILDI' : 'KAYIT YAPILIYOR'}
           </Text>
         )}
 
-        {/* Big Record Button */}
-        <Animated.View style={[styles.buttonRing, {transform: [{scale: pulseAnim}]}]}>
-          <TouchableOpacity
-            style={[
-              styles.recordButton,
-              status.isRecording && !status.isPaused && styles.recordButtonActive,
-              status.isPaused && styles.recordButtonPaused,
-            ]}
-            onPress={status.isRecording ? handleStopRecording : handleStartRecording}
-            activeOpacity={0.85}>
-            <View style={styles.recordButtonInner}>
-              {status.isRecording ? (
-                <View style={styles.stopSquare} />
-              ) : (
-                <>
-                  <View style={styles.cameraBody} />
-                  <View style={styles.cameraLens}>
-                    <View style={styles.cameraLensInner} />
-                  </View>
-                </>
-              )}
-            </View>
-          </TouchableOpacity>
-        </Animated.View>
+        {!status.isRecording && (
+          <Text style={styles.readyText}>Kayda Hazır</Text>
+        )}
 
-        <Text style={styles.recordLabel}>
-          {status.isRecording ? 'Kaydı Bitir' : 'Kaydı Başlat'}
+        {/* Main Record Button */}
+        <View style={styles.buttonContainer}>
+          {status.isRecording && (
+            <Animated.View style={[
+              styles.glowRing,
+              {
+                opacity: glowAnim,
+                borderColor: status.isPaused ? Colors.paused : Colors.recording,
+              },
+            ]} />
+          )}
+          <Animated.View style={[
+            styles.buttonOuter,
+            {transform: [{scale: pulseAnim}]},
+            status.isRecording && !status.isPaused && styles.buttonOuterRecording,
+            status.isPaused && styles.buttonOuterPaused,
+          ]}>
+            <TouchableOpacity
+              style={[
+                styles.recordButton,
+                status.isRecording && !status.isPaused && styles.recordButtonActive,
+                status.isPaused && styles.recordButtonPaused,
+              ]}
+              onPress={status.isRecording ? handleStopRecording : handleStartRecording}
+              activeOpacity={0.8}>
+              {status.isRecording ? (
+                <View style={styles.stopIcon} />
+              ) : (
+                <View style={styles.recordIcon} />
+              )}
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+
+        <Text style={styles.buttonLabel}>
+          {status.isRecording ? 'Kaydı Durdur' : 'Kaydı Başlat'}
         </Text>
 
-        {/* Pause/Resume only when recording */}
+        {/* Pause/Resume Button */}
         {status.isRecording && (
-          <TouchableOpacity style={styles.pauseBtn} onPress={handlePauseResume}>
-            <Text style={styles.pauseBtnText}>
+          <TouchableOpacity
+            style={[
+              styles.secondaryBtn,
+              status.isPaused && styles.secondaryBtnResume,
+            ]}
+            onPress={handlePauseResume}
+            activeOpacity={0.8}>
+            <Text style={styles.secondaryBtnText}>
               {status.isPaused ? '▶  Devam Et' : '⏸  Duraklat'}
             </Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* AdMob Banner Placeholder */}
-      <View style={styles.adBanner}>
-        <Text style={styles.adText}>Reklam</Text>
-        {/* AdMob BannerAd goes here */}
+      {/* Bottom Info */}
+      <View style={styles.bottomBar}>
+        <Text style={styles.versionText}>Velaud Recorder v2.0.0</Text>
       </View>
-
-      {/* Build info — small, unobtrusive, helps identify which APK is installed */}
-      <Text style={styles.buildInfo}>v1.0.9 (build 10)</Text>
     </SafeAreaView>
   );
 }
@@ -287,70 +359,124 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    paddingVertical: 16,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  logoContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: Colors.white,
   },
   headerTitle: {
     color: Colors.text,
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
     letterSpacing: 0.5,
   },
   settingsBtn: {
-    padding: 4,
-  },
-  gearIcon: {
-    width: 24,
-    height: 24,
+    width: 40,
+    height: 40,
     borderRadius: 12,
-    borderWidth: 2,
-    borderColor: Colors.textSecondary,
+    backgroundColor: Colors.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  settingsSummary: {
+  settingsIcon: {
+    fontSize: 20,
+  },
+  chipsRow: {
     flexDirection: 'row',
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingBottom: 12,
     gap: 8,
   },
-  settingChip: {
+  chip: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surfaceElevated,
     borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  settingChipText: {
+  chipActive: {
+    borderColor: Colors.success,
+    backgroundColor: 'rgba(74, 222, 128, 0.08)',
+  },
+  chipInactive: {
+    borderColor: Colors.border,
+  },
+  chipText: {
     color: Colors.textSecondary,
     fontSize: 13,
-    fontWeight: '500',
-  },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+    fontWeight: '600',
   },
   centerArea: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 20,
+    paddingHorizontal: 20,
+  },
+  durationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   duration: {
-    fontSize: 48,
+    fontSize: 52,
     fontWeight: '200',
     letterSpacing: 4,
     fontVariant: ['tabular-nums'],
   },
   statusLabel: {
     color: Colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 2,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 3,
+    marginBottom: 32,
   },
-  buttonRing: {
+  readyText: {
+    color: Colors.textMuted,
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 32,
+    letterSpacing: 1,
+  },
+  buttonContainer: {
+    width: 180,
+    height: 180,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  glowRing: {
+    position: 'absolute',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    borderWidth: 3,
+  },
+  buttonOuter: {
     width: 160,
     height: 160,
     borderRadius: 80,
@@ -358,102 +484,78 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.surfaceElevated,
+    backgroundColor: Colors.surface,
+  },
+  buttonOuterRecording: {
+    borderColor: Colors.recording,
+  },
+  buttonOuterPaused: {
+    borderColor: Colors.paused,
   },
   recordButton: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 12,
+    elevation: 16,
     shadowColor: Colors.primary,
-    shadowOffset: {width: 0, height: 6},
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
   },
   recordButtonActive: {
-    backgroundColor: Colors.primaryDark,
-    shadowColor: Colors.primaryDark,
+    backgroundColor: Colors.recording,
+    shadowColor: Colors.recording,
   },
   recordButtonPaused: {
-    backgroundColor: Colors.warning,
-    shadowColor: Colors.warning,
+    backgroundColor: Colors.paused,
+    shadowColor: Colors.paused,
   },
-  recordButtonInner: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    width: 60,
-    height: 50,
-  },
-  cameraBody: {
+  recordIcon: {
     width: 40,
-    height: 30,
-    backgroundColor: Colors.white,
-    borderRadius: 6,
-    position: 'absolute',
-    left: 0,
-  },
-  cameraLens: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Colors.white,
-    position: 'absolute',
-    right: 0,
-    top: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cameraLensInner: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: Colors.recording,
-  },
-  stopSquare: {
-    width: 34,
-    height: 34,
-    borderRadius: 6,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: Colors.white,
   },
-  recordLabel: {
+  stopIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: Colors.white,
+  },
+  buttonLabel: {
     color: Colors.textSecondary,
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 20,
   },
-  pauseBtn: {
+  secondaryBtn: {
     backgroundColor: Colors.surfaceElevated,
-    borderRadius: 24,
-    paddingHorizontal: 28,
-    paddingVertical: 12,
-    borderWidth: 1,
+    borderRadius: 28,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderWidth: 1.5,
     borderColor: Colors.border,
   },
-  pauseBtnText: {
+  secondaryBtnResume: {
+    borderColor: Colors.success,
+    backgroundColor: 'rgba(74, 222, 128, 0.08)',
+  },
+  secondaryBtnText: {
     color: Colors.text,
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
-  adBanner: {
-    height: 52,
-    backgroundColor: Colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
+  bottomBar: {
+    paddingVertical: 12,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  adText: {
+  versionText: {
     color: Colors.textMuted,
-    fontSize: 12,
-  },
-  buildInfo: {
-    color: Colors.textMuted,
-    fontSize: 10,
-    textAlign: 'center',
-    paddingBottom: 4,
-    opacity: 0.5,
+    fontSize: 11,
+    opacity: 0.6,
   },
 });

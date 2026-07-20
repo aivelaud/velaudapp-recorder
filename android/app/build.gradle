@@ -16,8 +16,8 @@ android {
         applicationId "com.recvelaud.android"
         minSdk rootProject.ext.minSdkVersion
         targetSdk rootProject.ext.targetSdkVersion
-        versionCode 10
-        versionName "1.0.9"
+        versionCode 11
+        versionName "2.0.0"
         multiDexEnabled true
     }
 

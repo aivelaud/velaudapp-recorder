@@ -22,7 +22,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function RecordIcon({focused}: {focused: boolean}) {
   return (
-    <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
+    <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
       <View style={[styles.recordDot, focused && styles.recordDotActive]} />
     </View>
   );
@@ -30,8 +30,8 @@ function RecordIcon({focused}: {focused: boolean}) {
 
 function VideosIcon({focused}: {focused: boolean}) {
   return (
-    <View style={styles.tabIconSimple}>
-      <View style={[styles.filmStrip, focused && styles.filmStripActive]} />
+    <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
+      <View style={[styles.filmIcon, focused && styles.filmIconActive]} />
     </View>
   );
 }
@@ -45,16 +45,22 @@ function MainTabs() {
           backgroundColor: Colors.surface,
           borderTopColor: Colors.border,
           borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 8,
+          height: 64,
+          paddingBottom: 10,
+          paddingTop: 10,
+          elevation: 20,
+          shadowColor: '#000',
+          shadowOffset: {width: 0, height: -4},
+          shadowOpacity: 0.3,
+          shadowRadius: 8,
         },
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textMuted,
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
+          fontSize: 11,
+          fontWeight: '700',
           letterSpacing: 0.5,
+          marginTop: 4,
         },
       }}>
       <Tab.Screen
@@ -94,8 +100,9 @@ function AppNavigator() {
           headerTitle: 'Ayarlar',
           headerStyle: {backgroundColor: Colors.surface},
           headerTintColor: Colors.text,
-          headerTitleStyle: {fontWeight: '700'},
+          headerTitleStyle: {fontWeight: '700', fontSize: 18},
           headerBackTitle: '',
+          headerShadowVisible: false,
         }}
       />
     </Stack.Navigator>
@@ -103,41 +110,34 @@ function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
-  tabIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: Colors.textMuted,
+  iconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
-  tabIconActive: {
-    borderColor: Colors.primary,
+  iconContainerActive: {
+    backgroundColor: 'rgba(108, 99, 255, 0.12)',
   },
   recordDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: Colors.textMuted,
   },
   recordDotActive: {
     backgroundColor: Colors.primary,
   },
-  tabIconSimple: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  filmStrip: {
-    width: 22,
-    height: 16,
+  filmIcon: {
+    width: 18,
+    height: 14,
     borderRadius: 3,
     borderWidth: 2,
     borderColor: Colors.textMuted,
   },
-  filmStripActive: {
+  filmIconActive: {
     borderColor: Colors.primary,
   },
 });
