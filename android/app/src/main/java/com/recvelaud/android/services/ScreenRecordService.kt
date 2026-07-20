@@ -130,9 +130,9 @@ class ScreenRecordService : Service() {
         val fps = intent.getIntExtra(EXTRA_FPS, 30)
         val includeAudio = intent.getBooleanExtra(EXTRA_INCLUDE_AUDIO, true)
 
-        if (resultCode == -1) {
-            Log.e(TAG, "Invalid result code for MediaProjection")
-            emitError("Geçersiz kayıt izni")
+        if (resultCode != android.app.Activity.RESULT_OK) {
+            Log.e(TAG, "Invalid result code for MediaProjection: $resultCode (expected ${android.app.Activity.RESULT_OK})")
+            emitError("Ekran kaydı izni reddedildi")
             stopSelf()
             return
         }
@@ -376,9 +376,28 @@ class ScreenRecordService : Service() {
         durationTimer = Timer()
         durationTimer?.scheduleAtFixedRate(object : TimerTask() {
             override fun run() {
-                if (isRecording) emitStatus()
+                if (isRecording) {
+                    emitStatus()
+                    handler.post { updateNotificationWithDuration() }
+                }
             }
         }, 1000L, 1000L)
+    }
+
+    private fun updateNotificationWithDuration() {
+        if (!isRecording) return
+        val durationMs = getDurationMs()
+        val totalSec = (durationMs / 1000).toInt()
+        val h = totalSec / 3600
+        val m = (totalSec % 3600) / 60
+        val s = totalSec % 60
+        val timeStr = String.format("%02d:%02d:%02d", h, m, s)
+        val text = if (isPaused) {
+            "Duraklatıldı - $timeStr"
+        } else {
+            "Kayıt yapılıyor - $timeStr"
+        }
+        updateNotification(text)
     }
 
     private fun emitStatus() {
@@ -468,6 +487,8 @@ class ScreenRecordService : Service() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setUsesChronometer(!isPaused)
+            .setWhen(if (!isPaused) System.currentTimeMillis() - getDurationMs() else System.currentTimeMillis())
             .build()
     }
 

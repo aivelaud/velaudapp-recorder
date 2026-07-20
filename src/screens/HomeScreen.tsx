@@ -14,6 +14,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {RootStackParamList} from '../navigation/AppNavigator';
 import {Colors} from '../theme/colors';
 import {Recorder, FloatingPanel, RecordingStatus, RecordingConfig} from '../modules/RecorderModule';
@@ -56,17 +57,15 @@ export default function HomeScreen() {
 
     const statusSub = Recorder.onRecordingStatus(s => setStatus(s));
     const savedSub = Recorder.onRecordingSaved(_filePath => {
-      ToastAndroid.show('✅ Video başarıyla kaydedildi!', ToastAndroid.SHORT);
+      ToastAndroid.show('Video başarıyla kaydedildi!', ToastAndroid.SHORT);
     });
     const errorSub = Recorder.onRecordingError(err => {
       Alert.alert('Kayıt Hatası', err);
     });
 
-    // Check overlay permission on mount
     FloatingPanel.checkOverlayPermission().then(granted => {
       setPermissionChecked(true);
       if (!granted) {
-        // Show a non-blocking toast
         ToastAndroid.show(
           'Ekran üstü izni gerekli - Ayarlardan verin',
           ToastAndroid.LONG,
@@ -126,7 +125,6 @@ export default function HomeScreen() {
 
   const handleStartRecording = useCallback(async () => {
     try {
-      // 1. Check overlay permission for floating panel
       const overlayOk = await FloatingPanel.checkOverlayPermission();
       if (!overlayOk) {
         Alert.alert(
@@ -149,7 +147,6 @@ export default function HomeScreen() {
         return;
       }
 
-      // 2. Audio permission
       if (settings.includeAudio) {
         const audioOk = await requestAudioPermission();
         if (!audioOk) {
@@ -157,7 +154,6 @@ export default function HomeScreen() {
         }
       }
 
-      // 3. Start recording
       const dims = SettingsManager.getResolutionDimensions(settings.resolution);
       const config: RecordingConfig = {
         width: dims.width || undefined,
@@ -176,7 +172,6 @@ export default function HomeScreen() {
         return;
       }
 
-      // 4. Show floating panel (non-blocking)
       try {
         await FloatingPanel.showPanel();
       } catch (panelErr: any) {
@@ -186,7 +181,7 @@ export default function HomeScreen() {
           ToastAndroid.LONG,
         );
       }
-      ToastAndroid.show('🔴 Kayıt başladı!', ToastAndroid.SHORT);
+      ToastAndroid.show('Kayıt başladı!', ToastAndroid.SHORT);
     } catch (e: any) {
       console.error('Recording start error:', e);
       Alert.alert('Hata', e?.message ?? 'Bilinmeyen bir hata oluştu.');
@@ -197,7 +192,7 @@ export default function HomeScreen() {
     try {
       await Recorder.stopRecording();
       await FloatingPanel.hidePanel();
-      ToastAndroid.show('⏹ Kayıt durduruldu', ToastAndroid.SHORT);
+      ToastAndroid.show('Kayıt durduruldu', ToastAndroid.SHORT);
     } catch (e: any) {
       console.error('Stop recording error:', e);
     }
@@ -207,10 +202,10 @@ export default function HomeScreen() {
     try {
       if (status.isPaused) {
         await Recorder.resumeRecording();
-        ToastAndroid.show('▶ Kayıt devam ediyor', ToastAndroid.SHORT);
+        ToastAndroid.show('Kayıt devam ediyor', ToastAndroid.SHORT);
       } else {
         await Recorder.pauseRecording();
-        ToastAndroid.show('⏸ Kayıt duraklatıldı', ToastAndroid.SHORT);
+        ToastAndroid.show('Kayıt duraklatıldı', ToastAndroid.SHORT);
       }
     } catch (e: any) {
       console.error('Pause/Resume error:', e);
@@ -226,7 +221,7 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.logoContainer}>
-            <View style={styles.logoDot} />
+            <Icon name="record-circle" size={18} color={Colors.white} />
           </View>
           <Text style={styles.headerTitle}>Velaud</Text>
         </View>
@@ -234,7 +229,7 @@ export default function HomeScreen() {
           style={styles.settingsBtn}
           onPress={() => navigation.navigate('Settings')}
           hitSlop={{top: 12, bottom: 12, left: 12, right: 12}}>
-          <Text style={styles.settingsIcon}>⚙️</Text>
+          <Icon name="cog" size={22} color={Colors.textSecondary} />
         </TouchableOpacity>
       </View>
 
@@ -243,18 +238,26 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={styles.chip}
           onPress={() => navigation.navigate('Settings')}>
-          <Text style={styles.chipText}>📐 {resolutionLabel}</Text>
+          <Icon name="quality-high" size={16} color={Colors.textSecondary} style={styles.chipIcon} />
+          <Text style={styles.chipText}>{resolutionLabel}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.chip}
           onPress={() => navigation.navigate('Settings')}>
-          <Text style={styles.chipText}>🎬 {settings.fps} FPS</Text>
+          <Icon name="filmstrip" size={16} color={Colors.textSecondary} style={styles.chipIcon} />
+          <Text style={styles.chipText}>{settings.fps} FPS</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.chip, settings.includeAudio ? styles.chipActive : styles.chipInactive]}
           onPress={() => navigation.navigate('Settings')}>
+          <Icon
+            name={settings.includeAudio ? 'microphone' : 'microphone-off'}
+            size={16}
+            color={settings.includeAudio ? Colors.success : Colors.textMuted}
+            style={styles.chipIcon}
+          />
           <Text style={styles.chipText}>
-            {settings.includeAudio ? '🎙️ Ses Açık' : '🔇 Sessiz'}
+            {settings.includeAudio ? 'Ses Açık' : 'Sessiz'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -313,9 +316,9 @@ export default function HomeScreen() {
               onPress={status.isRecording ? handleStopRecording : handleStartRecording}
               activeOpacity={0.8}>
               {status.isRecording ? (
-                <View style={styles.stopIcon} />
+                <Icon name="stop" size={40} color={Colors.white} />
               ) : (
-                <View style={styles.recordIcon} />
+                <Icon name="record" size={44} color={Colors.white} />
               )}
             </TouchableOpacity>
           </Animated.View>
@@ -334,8 +337,14 @@ export default function HomeScreen() {
             ]}
             onPress={handlePauseResume}
             activeOpacity={0.8}>
+            <Icon
+              name={status.isPaused ? 'play' : 'pause'}
+              size={20}
+              color={Colors.text}
+              style={styles.secondaryBtnIcon}
+            />
             <Text style={styles.secondaryBtnText}>
-              {status.isPaused ? '▶  Devam Et' : '⏸  Duraklat'}
+              {status.isPaused ? 'Devam Et' : 'Duraklat'}
             </Text>
           </TouchableOpacity>
         )}
@@ -374,12 +383,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: Colors.white,
-  },
   headerTitle: {
     color: Colors.text,
     fontSize: 22,
@@ -393,9 +396,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  settingsIcon: {
-    fontSize: 20,
   },
   chipsRow: {
     flexDirection: 'row',
@@ -419,6 +419,9 @@ const styles = StyleSheet.create({
   },
   chipInactive: {
     borderColor: Colors.border,
+  },
+  chipIcon: {
+    marginRight: 6,
   },
   chipText: {
     color: Colors.textSecondary,
@@ -513,18 +516,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.paused,
     shadowColor: Colors.paused,
   },
-  recordIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.white,
-  },
-  stopIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: Colors.white,
-  },
   buttonLabel: {
     color: Colors.textSecondary,
     fontSize: 16,
@@ -532,6 +523,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   secondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: Colors.surfaceElevated,
     borderRadius: 28,
     paddingHorizontal: 32,
@@ -542,6 +535,9 @@ const styles = StyleSheet.create({
   secondaryBtnResume: {
     borderColor: Colors.success,
     backgroundColor: 'rgba(74, 222, 128, 0.08)',
+  },
+  secondaryBtnIcon: {
+    marginRight: 8,
   },
   secondaryBtnText: {
     color: Colors.text,

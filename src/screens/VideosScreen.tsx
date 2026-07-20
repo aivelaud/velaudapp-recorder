@@ -13,6 +13,7 @@ import {
   ToastAndroid,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Colors} from '../theme/colors';
 import {VideoLibrary, VideoItem} from '../modules/VideoLibraryModule';
 
@@ -85,7 +86,7 @@ function VideoCard({item, onDelete}: {item: VideoItem; onDelete: (item: VideoIte
           />
         ) : (
           <View style={styles.thumbnailPlaceholder}>
-            <Text style={styles.playIcon}>▶</Text>
+            <Icon name="play-circle-outline" size={40} color={Colors.textMuted} />
           </View>
         )}
         <View style={styles.durationBadge}>
@@ -100,11 +101,11 @@ function VideoCard({item, onDelete}: {item: VideoItem; onDelete: (item: VideoIte
         </Text>
         <View style={styles.metaRow}>
           <Text style={styles.metaText}>{formatDate(item.dateAdded)}</Text>
-          <Text style={styles.metaDot}>•</Text>
+          <Icon name="circle-small" size={14} color={Colors.textMuted} />
           <Text style={styles.metaText}>{formatSize(item.size)}</Text>
           {item.width > 0 && (
             <>
-              <Text style={styles.metaDot}>•</Text>
+              <Icon name="circle-small" size={14} color={Colors.textMuted} />
               <Text style={styles.metaText}>{item.width}×{item.height}</Text>
             </>
           )}
@@ -113,10 +114,11 @@ function VideoCard({item, onDelete}: {item: VideoItem; onDelete: (item: VideoIte
         {/* Actions */}
         <View style={styles.actionsRow}>
           <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
-            <Text style={styles.shareBtnText}>📤 Paylaş</Text>
+            <Icon name="share-variant" size={16} color={Colors.text} style={styles.actionIcon} />
+            <Text style={styles.shareBtnText}>Paylaş</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-            <Text style={styles.deleteBtnText}>🗑️</Text>
+            <Icon name="delete-outline" size={20} color={Colors.error} />
           </TouchableOpacity>
         </View>
       </View>
@@ -194,7 +196,7 @@ export default function VideosScreen() {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <View style={styles.emptyIconContainer}>
-              <Text style={styles.emptyEmoji}>🎬</Text>
+              <Icon name="video-off-outline" size={40} color={Colors.textMuted} />
             </View>
             <Text style={styles.emptyTitle}>Henüz video yok</Text>
             <Text style={styles.emptySubtitle}>
@@ -271,10 +273,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  playIcon: {
-    fontSize: 32,
-    color: Colors.textMuted,
-  },
   durationBadge: {
     position: 'absolute',
     bottom: 10,
@@ -301,15 +299,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 6,
-    gap: 6,
+    gap: 2,
   },
   metaText: {
     color: Colors.textMuted,
     fontSize: 12,
-  },
-  metaDot: {
-    color: Colors.textMuted,
-    fontSize: 8,
   },
   actionsRow: {
     flexDirection: 'row',
@@ -317,12 +311,17 @@ const styles = StyleSheet.create({
     marginTop: 12,
     gap: 8,
   },
+  actionIcon: {
+    marginRight: 6,
+  },
   shareBtn: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: Colors.surfaceElevated,
     borderRadius: 10,
     paddingVertical: 10,
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -341,9 +340,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.error,
   },
-  deleteBtnText: {
-    fontSize: 16,
-  },
   emptyState: {
     flex: 1,
     alignItems: 'center',
@@ -359,9 +355,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
-  },
-  emptyEmoji: {
-    fontSize: 36,
   },
   emptyTitle: {
     color: Colors.text,

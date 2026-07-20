@@ -1,7 +1,8 @@
 import React from 'react';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import {View, Text, StyleSheet} from 'react-native';
+import {View, StyleSheet, Platform} from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Colors} from '../theme/colors';
 import HomeScreen from '../screens/HomeScreen';
 import VideosScreen from '../screens/VideosScreen';
@@ -20,22 +21,6 @@ export type RootStackParamList = {
 const Tab = createBottomTabNavigator<RootTabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-function RecordIcon({focused}: {focused: boolean}) {
-  return (
-    <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
-      <View style={[styles.recordDot, focused && styles.recordDotActive]} />
-    </View>
-  );
-}
-
-function VideosIcon({focused}: {focused: boolean}) {
-  return (
-    <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
-      <View style={[styles.filmIcon, focused && styles.filmIconActive]} />
-    </View>
-  );
-}
-
 function MainTabs() {
   return (
     <Tab.Navigator
@@ -45,8 +30,8 @@ function MainTabs() {
           backgroundColor: Colors.surface,
           borderTopColor: Colors.border,
           borderTopWidth: 1,
-          height: 64,
-          paddingBottom: 10,
+          height: 72,
+          paddingBottom: 16,
           paddingTop: 10,
           elevation: 20,
           shadowColor: '#000',
@@ -68,7 +53,13 @@ function MainTabs() {
         component={HomeScreen}
         options={{
           tabBarLabel: 'Kaydet',
-          tabBarIcon: ({focused}) => <RecordIcon focused={focused} />,
+          tabBarIcon: ({focused, color}) => (
+            <Icon
+              name={focused ? 'record-circle' : 'record-circle-outline'}
+              size={24}
+              color={color}
+            />
+          ),
         }}
       />
       <Tab.Screen
@@ -76,7 +67,13 @@ function MainTabs() {
         component={VideosScreen}
         options={{
           tabBarLabel: 'Videolarım',
-          tabBarIcon: ({focused}) => <VideosIcon focused={focused} />,
+          tabBarIcon: ({focused, color}) => (
+            <Icon
+              name={focused ? 'filmstrip-box' : 'filmstrip-box-multiple'}
+              size={24}
+              color={color}
+            />
+          ),
         }}
       />
     </Tab.Navigator>
@@ -109,37 +106,6 @@ function AppNavigator() {
   );
 }
 
-const styles = StyleSheet.create({
-  iconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-  },
-  iconContainerActive: {
-    backgroundColor: 'rgba(108, 99, 255, 0.12)',
-  },
-  recordDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: Colors.textMuted,
-  },
-  recordDotActive: {
-    backgroundColor: Colors.primary,
-  },
-  filmIcon: {
-    width: 18,
-    height: 14,
-    borderRadius: 3,
-    borderWidth: 2,
-    borderColor: Colors.textMuted,
-  },
-  filmIconActive: {
-    borderColor: Colors.primary,
-  },
-});
+const styles = StyleSheet.create({});
 
 export default AppNavigator;

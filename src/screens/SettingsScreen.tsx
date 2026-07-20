@@ -8,6 +8,7 @@ import {
   ScrollView,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Colors} from '../theme/colors';
 import {SettingsManager, AppSettings} from '../modules/SettingsManager';
 
@@ -33,15 +34,15 @@ export default function SettingsScreen() {
     await SettingsManager.save(patch);
   };
 
-  const resolutions: {label: string; desc: string; value: ResolutionOption}[] = [
-    {label: '720p', desc: 'HD • Küçük dosya boyutu', value: '720p'},
-    {label: '1080p', desc: 'Full HD • Önerilen', value: '1080p'},
-    {label: 'Cihaz', desc: 'Cihaz çözünürlüğü', value: 'device'},
+  const resolutions: {label: string; desc: string; value: ResolutionOption; icon: string}[] = [
+    {label: '720p', desc: 'HD - Küçük dosya boyutu', value: '720p', icon: 'quality-low'},
+    {label: '1080p', desc: 'Full HD - Önerilen', value: '1080p', icon: 'quality-high'},
+    {label: 'Cihaz', desc: 'Cihaz çözünürlüğü', value: 'device', icon: 'cellphone'},
   ];
 
   const fpsOptions: {label: string; desc: string; value: FpsOption}[] = [
-    {label: '30 FPS', desc: 'Standart • Küçük dosya', value: 30},
-    {label: '60 FPS', desc: 'Ultra akıcı • Büyük dosya', value: 60},
+    {label: '30 FPS', desc: 'Standart - Küçük dosya', value: 30},
+    {label: '60 FPS', desc: 'Ultra akıcı - Büyük dosya', value: 60},
   ];
 
   return (
@@ -60,16 +61,26 @@ export default function SettingsScreen() {
                   settings.resolution === opt.value && styles.optionCardSelected,
                 ]}
                 onPress={() => update({resolution: opt.value})}>
-                <Text style={[
-                  styles.optionLabel,
-                  settings.resolution === opt.value && styles.optionLabelSelected,
-                ]}>
-                  {opt.label}
-                </Text>
-                <Text style={styles.optionDesc}>{opt.desc}</Text>
+                <View style={styles.optionRow}>
+                  <Icon
+                    name={opt.icon}
+                    size={20}
+                    color={settings.resolution === opt.value ? Colors.primary : Colors.textSecondary}
+                    style={styles.optionIcon}
+                  />
+                  <View style={styles.optionTextContainer}>
+                    <Text style={[
+                      styles.optionLabel,
+                      settings.resolution === opt.value && styles.optionLabelSelected,
+                    ]}>
+                      {opt.label}
+                    </Text>
+                    <Text style={styles.optionDesc}>{opt.desc}</Text>
+                  </View>
+                </View>
                 {settings.resolution === opt.value && (
                   <View style={styles.checkMark}>
-                    <Text style={styles.checkText}>✓</Text>
+                    <Icon name="check" size={14} color={Colors.white} />
                   </View>
                 )}
               </TouchableOpacity>
@@ -106,7 +117,9 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <View style={styles.toggleRow}>
             <View style={styles.toggleLeft}>
-              <Text style={styles.toggleEmoji}>🎙️</Text>
+              <View style={styles.toggleIconContainer}>
+                <Icon name="microphone" size={22} color={Colors.primary} />
+              </View>
               <View style={styles.toggleInfo}>
                 <Text style={styles.toggleLabel}>Ses Kaydı</Text>
                 <Text style={styles.toggleDesc}>Mikrofon sesini dahil et</Text>
@@ -124,7 +137,9 @@ export default function SettingsScreen() {
 
           <View style={styles.toggleRow}>
             <View style={styles.toggleLeft}>
-              <Text style={styles.toggleEmoji}>👆</Text>
+              <View style={styles.toggleIconContainer}>
+                <Icon name="gesture-tap" size={22} color={Colors.primary} />
+              </View>
               <View style={styles.toggleInfo}>
                 <Text style={styles.toggleLabel}>Dokunma Göstergesi</Text>
                 <Text style={styles.toggleDesc}>Ekrana dokunulduğunda göster</Text>
@@ -143,7 +158,9 @@ export default function SettingsScreen() {
         <Text style={styles.sectionHeader}>DEPOLAMA</Text>
         <View style={styles.section}>
           <View style={styles.infoRow}>
-            <Text style={styles.infoEmoji}>📁</Text>
+            <View style={styles.toggleIconContainer}>
+              <Icon name="folder-outline" size={22} color={Colors.primary} />
+            </View>
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Kayıt Konumu</Text>
               <Text style={styles.infoValue}>/{settings.saveFolder}</Text>
@@ -156,10 +173,11 @@ export default function SettingsScreen() {
 
         {/* About */}
         <View style={styles.aboutSection}>
+          <Icon name="record-circle" size={28} color={Colors.primary} />
           <Text style={styles.aboutTitle}>Velaud Recorder</Text>
           <Text style={styles.aboutVersion}>v2.0.0 (build 11)</Text>
           <Text style={styles.aboutDesc}>
-            Profesyonel ekran kaydedici • Gizlilik odaklı
+            Profesyonel ekran kaydedici
           </Text>
         </View>
       </ScrollView>
@@ -197,17 +215,29 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   optionCard: {
-    flexDirection: 'column',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: Colors.surfaceElevated,
     borderRadius: 12,
     padding: 14,
     borderWidth: 1.5,
     borderColor: Colors.border,
-    position: 'relative',
   },
   optionCardSelected: {
     borderColor: Colors.primary,
     backgroundColor: 'rgba(108, 99, 255, 0.08)',
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  optionIcon: {
+    marginRight: 12,
+  },
+  optionTextContainer: {
+    flex: 1,
   },
   optionLabel: {
     color: Colors.textSecondary,
@@ -223,20 +253,12 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   checkMark: {
-    position: 'absolute',
-    top: 12,
-    right: 14,
     width: 22,
     height: 22,
     borderRadius: 11,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  checkText: {
-    color: Colors.white,
-    fontSize: 12,
-    fontWeight: '800',
   },
   optionsRow: {
     flexDirection: 'row',
@@ -281,8 +303,13 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 12,
   },
-  toggleEmoji: {
-    fontSize: 24,
+  toggleIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: 'rgba(108, 99, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   toggleInfo: {flex: 1},
   toggleLabel: {
@@ -305,10 +332,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 12,
   },
-  infoEmoji: {
-    fontSize: 24,
-    marginTop: 2,
-  },
   infoContent: {flex: 1},
   infoLabel: {
     color: Colors.textSecondary,
@@ -329,21 +352,22 @@ const styles = StyleSheet.create({
   aboutSection: {
     alignItems: 'center',
     paddingVertical: 24,
+    gap: 4,
   },
   aboutTitle: {
     color: Colors.text,
     fontSize: 18,
     fontWeight: '800',
+    marginTop: 8,
   },
   aboutVersion: {
     color: Colors.primary,
     fontSize: 13,
     fontWeight: '600',
-    marginTop: 4,
   },
   aboutDesc: {
     color: Colors.textMuted,
     fontSize: 12,
-    marginTop: 6,
+    marginTop: 2,
   },
 });
