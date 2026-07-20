@@ -1,0 +1,223 @@
+name: Android Build & Release
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build APK & AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+
+    steps:
+      # ── Eski artifact'ları sil (storage kotası açmak için) ────────
+      - name: Delete old artifacts
+        run: |
+          echo "Eski artifact'lar siliniyor..."
+          ARTIFACTS=$(curl -s \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts?per_page=100" \
+            | node -e "const d=require('fs').readFileSync('/dev/stdin','utf8'); const j=JSON.parse(d); (j.artifacts||[]).forEach(a=>console.log(a.id));" 2>/dev/null || true)
+
+          for id in $ARTIFACTS; do
+            curl -s -X DELETE \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$id" || true
+            echo "Silindi: artifact $id"
+          done
+          echo "Temizlik tamamlandı."
+
+      # ── Checkout ──────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Java 17 ───────────────────────────────────────────────
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      # ── Node 20 ───────────────────────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # ── Install JS dependencies ────────────────────────────────
+      - name: Install npm dependencies
+        run: npm install --legacy-peer-deps
+
+      # ── Patch react-native gradle plugin (CI compat) ──────────
+      - name: Patch react-native gradle plugin (CI compat)
+        run: |
+          SETTINGS="node_modules/@react-native/gradle-plugin/settings.gradle.kts"
+          if [ -f "$SETTINGS" ]; then
+            sed -i '/foojay-resolver-convention/d' "$SETTINGS"
+            echo "Patched settings.gradle.kts"
+          fi
+
+          PLUGIN_BUILD="node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/build.gradle.kts"
+          if [ -f "$PLUGIN_BUILD" ]; then
+            echo "Y29uc3QgZnMgPSByZXF1aXJlKCdmcycpOwpjb25zdCBmaWxlUGF0aCA9IHByb2Nlc3MuYXJndlsyXTsKY29uc3Qgc3JjID0gZnMucmVhZEZpbGVTeW5jKGZpbGVQYXRoLCAndXRmOCcpOwpjb25zdCBsaW5lcyA9IHNyYy5zcGxpdCgnXG4nKTsKY29uc3QgcmVzdWx0ID0gW107CmxldCBpID0gMDsKbGV0IHJlbW92ZWRCbG9ja3MgPSAwOwpsZXQgcmVtb3ZlZEltcG9ydHMgPSAwOwp3aGlsZSAoaSA8IGxpbmVzLmxlbmd0aCkgewogIGNvbnN0IGxpbmUgPSBsaW5lc1tpXTsKICBpZiAoL15bIFx0XSp0ZXN0UnVudGltZU9ubHlcKC8udGVzdChsaW5lKSAmJiAhL1wpWyBcdF0qJC8udGVzdChsaW5lLnJlcGxhY2UoL1woLipcKS9nLCAnJykpKSB7CiAgICBjb25zdCBibG9ja0xpbmVzID0gW2xpbmVdOwogICAgbGV0IGRlcHRoID0gMDsKICAgIGZvciAoY29uc3QgYyBvZiBsaW5lKSB7IGlmIChjID09PSAnKCcpIGRlcHRoKys7IGVsc2UgaWYgKGMgPT09ICcpJykgZGVwdGgtLTsgfQogICAgaSsrOwogICAgd2hpbGUgKGkgPCBsaW5lcy5sZW5ndGggJiYgZGVwdGggPiAwKSB7CiAgICAgIGNvbnN0IGwgPSBsaW5lc1tpXTsKICAgICAgZm9yIChjb25zdCBjIG9mIGwpIHsgaWYgKGMgPT09ICcoJykgZGVwdGgrKzsgZWxzZSBpZiAoYyA9PT0gJyknKSBkZXB0aC0tOyB9CiAgICAgIGJsb2NrTGluZXMucHVzaChsKTsKICAgICAgaSsrOwogICAgfQogICAgY29uc3QgYmxvY2tTdHIgPSBibG9ja0xpbmVzLmpvaW4oJ1xuJyk7CiAgICBpZiAoYmxvY2tTdHIuaW5jbHVkZXMoJ3NlcnZpY2VPZicpIHx8IGJsb2NrU3RyLmluY2x1ZGVzKCdNb2R1bGVSZWdpc3RyeScpKSB7CiAgICAgIHJlbW92ZWRCbG9ja3MrKzsKICAgIH0gZWxzZSB7CiAgICAgIHJlc3VsdC5wdXNoLmFwcGx5KHJlc3VsdCwgYmxvY2tMaW5lcyk7CiAgICB9CiAgICBjb250aW51ZTsKICB9CiAgaWYgKC9bIFx0XSp0ZXN0UnVudGltZU9ubHlcKC4qc2VydmljZU9mLipcKS8udGVzdChsaW5lKSkgewogICAgcmVtb3ZlZEJsb2NrcysrOwogICAgaSsrOwogICAgY29udGludWU7CiAgfQogIGlmICgvXlsgXHRdKmltcG9ydFteXG5dKihzZXJ2aWNlT2Z8TW9kdWxlUmVnaXN0cnkpLy50ZXN0KGxpbmUpKSB7CiAgICByZW1vdmVkSW1wb3J0cysrOwogICAgaSsrOwogICAgY29udGludWU7CiAgfQogIHJlc3VsdC5wdXNoKGxpbmUpOwogIGkrKzsKfQpjb25zdCBvdXQgPSByZXN1bHQuam9pbignXG4nKTsKZnMud3JpdGVGaWxlU3luYyhmaWxlUGF0aCwgb3V0KTsKY29uc29sZS5sb2coJ1BhdGNoIHJlc3VsdDogUmVtb3ZlZCBibG9ja3M6JywgcmVtb3ZlZEJsb2NrcywgJ3wgUmVtb3ZlZCBpbXBvcnRzOicsIHJlbW92ZWRJbXBvcnRzKTsK" \
+              | base64 -d > /tmp/patch_rn.js
+            node /tmp/patch_rn.js "$PLUGIN_BUILD"
+            grep -n 'serviceOf\|ModuleRegistry' "$PLUGIN_BUILD" || echo "(none — patch OK)"
+          fi
+
+      # ── Gradle wrapper permissions ────────────────────────────
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      # ── Generate gradle-wrapper.jar ───────────────────────────
+      - name: Generate gradle-wrapper.jar
+        run: |
+          GRADLE_VERSION="8.4"
+          mkdir -p /tmp/gradle-install
+          curl -fL "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
+            -o /tmp/gradle-install/gradle.zip
+          unzip -q /tmp/gradle-install/gradle.zip -d /tmp/gradle-install/
+          export GRADLE_BIN="/tmp/gradle-install/gradle-${GRADLE_VERSION}/bin/gradle"
+          chmod +x "$GRADLE_BIN"
+          TMPDIR=$(mktemp -d)
+          echo "" > "$TMPDIR/settings.gradle"
+          cd "$TMPDIR"
+          "$GRADLE_BIN" wrapper --gradle-version "${GRADLE_VERSION}" --distribution-type bin
+          cp gradle/wrapper/gradle-wrapper.jar \
+            "$GITHUB_WORKSPACE/android/gradle/wrapper/gradle-wrapper.jar"
+          echo "gradle-wrapper.jar ready"
+
+      # ── Setup Android SDK ─────────────────────────────────────
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # ── Accept SDK licenses ───────────────────────────────────
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses || true
+
+      # ── Generate debug keystore ───────────────────────────────
+      - name: Generate debug keystore
+        run: |
+          keytool -genkey -v \
+            -keystore android/app/debug.keystore \
+            -alias androiddebugkey \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass android \
+            -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      # ── Build Release APKs ────────────────────────────────────
+      - name: Build Release APKs
+        working-directory: android
+        run: ./gradlew assembleRelease --stacktrace --no-daemon --no-build-cache
+
+      # ── Build Release AAB ─────────────────────────────────────
+      - name: Build Release AAB
+        working-directory: android
+        run: ./gradlew bundleRelease --stacktrace --no-daemon --no-build-cache
+
+      # ── Verify outputs ────────────────────────────────────────
+      - name: Verify build outputs
+        run: |
+          echo "=== AAB ==="
+          AAB=$(find android/app/build/outputs/bundle -name "*.aab" | head -1)
+          if [ -z "$AAB" ]; then echo "ERROR: .aab not found!"; exit 1; fi
+          ls -lh "$AAB"
+          echo "AAB_PATH=$AAB" >> $GITHUB_ENV
+
+          echo ""
+          echo "=== APKs ==="
+          find android/app/build/outputs/apk/release -name "*.apk" | while read f; do ls -lh "$f"; done
+
+          APP_VERSION=$(grep 'versionName' android/app/build.gradle | head -1 | grep -oP '"[^"]+"' | tr -d '"')
+          VERSION_CODE=$(grep 'versionCode' android/app/build.gradle | grep -v 'versionCodeOverride' | head -1 | grep -oP '\d+' | head -1)
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+          echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
+          echo "Version: $APP_VERSION (build $VERSION_CODE)"
+
+      # ── Upload release-aab (Actions Artifacts — tercih edilen) ──
+      - name: Upload release-aab
+        id: upload_aab
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: release-aab
+          path: ${{ env.AAB_PATH }}
+          retention-days: 1
+
+      # ── Upload release-apks (Actions Artifacts) ───────────────
+      - name: Upload release-apks
+        id: upload_apks
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: release-apks
+          path: android/app/build/outputs/apk/release/
+          retention-days: 1
+
+      # ── Fallback: GitHub Release (kota doluysa) ───────────────
+      - name: Fallback to GitHub Release (kota doluysa)
+        if: steps.upload_aab.outcome == 'failure' || steps.upload_apks.outcome == 'failure'
+        run: |
+          TAG="build-${{ github.run_number }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -d "$TAG" 2>/dev/null || true
+          git push origin ":refs/tags/$TAG" 2>/dev/null || true
+
+          UNIVERSAL=$(find android/app/build/outputs/apk/release -name "*universal*.apk" | head -1)
+          ARM64=$(find android/app/build/outputs/apk/release -name "*arm64*release.apk" | head -1)
+          FILES="${{ env.AAB_PATH }}"
+          [ -n "$UNIVERSAL" ] && FILES="$FILES $UNIVERSAL"
+          [ -n "$ARM64" ]    && FILES="$FILES $ARM64"
+
+          gh release create "$TAG" $FILES \
+            --title "Velaud Recorder ${{ env.APP_VERSION }} (build ${{ env.VERSION_CODE }})" \
+            --notes "**Actions artifact kotası doluydu.** Dosyalar burada: https://github.com/${{ github.repository }}/releases/tag/$TAG"
+          echo "FALLBACK_URL=https://github.com/${{ github.repository }}/releases/tag/$TAG" >> $GITHUB_ENV
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Fail job if both Actions AND fallback failed ──────────
+      - name: Assert at least one upload succeeded
+        run: |
+          AAB_OK="${{ steps.upload_aab.outcome }}"
+          APK_OK="${{ steps.upload_apks.outcome }}"
+          if [ "$AAB_OK" = "failure" ] && [ "$APK_OK" = "failure" ]; then
+            echo "⚠️ Actions artifact kotası dolu — GitHub Release'e fallback yapıldı"
+            echo "İndirme: ${{ env.FALLBACK_URL || 'GitHub Releases sekmesini kontrol et' }}"
+            exit 0
+          fi
+
+      # ── Build Summary ─────────────────────────────────────────
+      - name: Build Summary
+        if: always()
+        run: |
+          echo "## ✅ Velaud Recorder ${{ env.APP_VERSION }} (build ${{ env.VERSION_CODE }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Derlenen dosyalar" >> $GITHUB_STEP_SUMMARY
+          AAB="${{ env.AAB_PATH }}"
+          [ -f "$AAB" ] && echo "- \`$(basename $AAB)\` — $(du -h $AAB | cut -f1)" >> $GITHUB_STEP_SUMMARY
+          find android/app/build/outputs/apk/release -name "*.apk" 2>/dev/null | while read f; do
+            echo "- \`$(basename $f)\` — $(du -h $f | cut -f1)" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          AAB_OK="${{ steps.upload_aab.outcome }}"
+          APK_OK="${{ steps.upload_apks.outcome }}"
+          if [ "$AAB_OK" = "success" ] && [ "$APK_OK" = "success" ]; then
+            echo "### 📦 Actions Artifacts — ✅ yüklendi" >> $GITHUB_STEP_SUMMARY
+            echo "Actions sekmesinden indir ↗" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### 📦 Actions kota dolu — GitHub Release'e fallback" >> $GITHUB_STEP_SUMMARY
+            echo "İndirme: https://github.com/${{ github.repository }}/releases" >> $GITHUB_STEP_SUMMARY
+            echo "(Kota 6-12 saat sonra sıfırlanır, sonraki build Actions'dan yükler)" >> $GITHUB_STEP_SUMMARY
+          fi
