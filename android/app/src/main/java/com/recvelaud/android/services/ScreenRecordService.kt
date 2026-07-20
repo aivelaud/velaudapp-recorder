@@ -86,7 +86,8 @@ class ScreenRecordService : Service() {
             }
             mediaRecorder?.release()
             virtualDisplay?.release()
-            projectionCallback?.let { mediaProjection?.unregisterCallback(it) }
+            val cbDestroy = projectionCallback
+            if (cbDestroy != null) { mediaProjection?.unregisterCallback(cbDestroy) }
             mediaProjection?.stop()
         } catch (_: Exception) {
         } finally {
@@ -171,7 +172,10 @@ class ScreenRecordService : Service() {
                     handler.post { stopRecording() }
                 }
             }
-            mediaProjection?.registerCallback(projectionCallback, handler)
+            val cb = projectionCallback
+            if (cb != null) {
+                mediaProjection?.registerCallback(cb, handler)
+            }
 
             // Set up MediaRecorder
             mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -274,7 +278,8 @@ class ScreenRecordService : Service() {
             try {
                 mediaRecorder?.release()
                 virtualDisplay?.release()
-                projectionCallback?.let { mediaProjection?.unregisterCallback(it) }
+                val cbErr = projectionCallback
+                if (cbErr != null) { mediaProjection?.unregisterCallback(cbErr) }
                 mediaProjection?.stop()
             } catch (_: Exception) {}
             
@@ -299,7 +304,8 @@ class ScreenRecordService : Service() {
             mediaRecorder = null
             virtualDisplay?.release()
             virtualDisplay = null
-            projectionCallback?.let { mediaProjection?.unregisterCallback(it) }
+            val cbStop = projectionCallback
+            if (cbStop != null) { mediaProjection?.unregisterCallback(cbStop) }
             mediaProjection?.stop()
             mediaProjection = null
             projectionCallback = null
