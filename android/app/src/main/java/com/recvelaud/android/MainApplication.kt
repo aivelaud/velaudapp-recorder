@@ -15,6 +15,7 @@ import com.recvelaud.android.modules.RecorderPackage
 import com.recvelaud.android.modules.FloatingPanelPackage
 import com.recvelaud.android.modules.VideoLibraryPackage
 import com.recvelaud.android.modules.PreviewOverlayPackage
+import com.recvelaud.android.modules.VideoEditorPackage
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -31,7 +32,8 @@ class MainApplication : Application(), ReactApplication {
                     RecorderPackage(),
                     FloatingPanelPackage(),
                     VideoLibraryPackage(),
-                    PreviewOverlayPackage()
+                    PreviewOverlayPackage(),
+                    VideoEditorPackage()
                 )
 
             override fun getJSMainModuleName(): String = "index"

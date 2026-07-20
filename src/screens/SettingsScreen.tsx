@@ -272,7 +272,7 @@ export default function SettingsScreen() {
           <Row
             icon="information-outline"
             label="Velaud Recorder"
-            value="v2.2.1"
+            value="v2.4.0"
             last
           />
         </Section>

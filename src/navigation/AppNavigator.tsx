@@ -9,6 +9,7 @@ import HomeScreen from '../screens/HomeScreen';
 import VideosScreen from '../screens/VideosScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import RecordingPreviewScreen from '../screens/RecordingPreviewScreen';
+import VideoEditorScreen from '../screens/VideoEditorScreen';
 
 // ─── Navigation type definitions ────────────────────────────────────────────
 export type RootTabParamList = {
@@ -20,6 +21,7 @@ export type RootTabParamList = {
 export type RootStackParamList = {
   Main: undefined;
   RecordingPreview: {filePath: string};
+  VideoEditor: {filePath: string};
 };
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -121,6 +123,11 @@ export default function AppNavigator() {
         name="RecordingPreview"
         component={RecordingPreviewScreen}
         options={{animation: 'slide_from_bottom'}}
+      />
+      <Stack.Screen
+        name="VideoEditor"
+        component={VideoEditorScreen}
+        options={{animation: 'slide_from_right'}}
       />
     </Stack.Navigator>
   );

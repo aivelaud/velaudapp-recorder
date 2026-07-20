@@ -10,9 +10,10 @@ import {
   ToastAndroid,
   Dimensions,
   ScrollView,
+  Image,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useFocusEffect} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Colors} from '../theme/colors';
@@ -143,6 +144,13 @@ export default function HomeScreen() {
   useEffect(() => {
     SettingsManager.load().then(setSettings);
   }, []);
+
+  // Reload settings when returning from Settings screen (fixes FPS/resolution sync)
+  useFocusEffect(
+    useCallback(() => {
+      SettingsManager.load().then(setSettings);
+    }, []),
+  );
 
   useEffect(() => {
     const statusSub = Recorder.onRecordingStatus(s => setStatus(s));
@@ -315,10 +323,11 @@ export default function HomeScreen() {
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <View style={styles.headerBrand}>
-          <View style={styles.logoMark}>
-            <Icon name="record-circle" size={15} color={Colors.white} />
-          </View>
-          <Text style={styles.brandName}>Velaud</Text>
+          <Image
+            source={require('../../android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png')}
+            style={styles.logoMark}
+          />
+          <Text style={styles.brandName}>Velaud Recorder</Text>
         </View>
         <View style={styles.headerActions}>
           {isRecording && (
@@ -371,8 +380,8 @@ export default function HomeScreen() {
           ]}>
           <View style={[styles.discInner, {backgroundColor: btnBg}]}>
             <Icon
-              name={isRecording ? 'stop' : 'record'}
-              size={34}
+              name={isRecording ? 'stop' : 'video'}
+              size={42}
               color={Colors.white}
             />
           </View>
@@ -424,8 +433,8 @@ export default function HomeScreen() {
             onPressOut={onPressOut}
             activeOpacity={1}>
             <Icon
-              name={isRecording ? 'stop' : 'record'}
-              size={20}
+              name={isRecording ? 'stop' : 'video'}
+              size={22}
               color={Colors.white}
               style={styles.ctaIcon}
             />
@@ -464,12 +473,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   logoMark: {
-    width: 28,
-    height: 28,
+    width: 32,
+    height: 32,
     borderRadius: 8,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   brandName: {
     color: Colors.white,

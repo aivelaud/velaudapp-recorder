@@ -356,6 +356,9 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
 
         // Stop button
         val stopBtn = buildCircleButton(ctx, "\u23F9", "Durdur", 0xFFFF4757.toInt()) {
+            durationTimer?.cancel()
+            durationTimer = null
+            durationTextView?.text = "00:00"
             sendServiceAction(ScreenRecordService.ACTION_STOP)
             Handler(Looper.getMainLooper()).postDelayed({ removePanel() }, 300)
         }

@@ -14,10 +14,15 @@ import {
   Dimensions,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import {useNavigation} from '@react-navigation/native';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Colors} from '../theme/colors';
 import {VideoLibrary, VideoItem} from '../modules/VideoLibraryModule';
 import {Recorder} from '../modules/RecorderModule';
+import {RootStackParamList} from '../navigation/AppNavigator';
+
+type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
 const {width: W} = Dimensions.get('window');
 const THUMB_W = (W - 20 * 2 - 10) / 2; // 2-column grid, 20px side padding, 10px gap
@@ -52,13 +57,18 @@ function VideoCard({
   item,
   onDelete,
   onShare,
+  onPress,
 }: {
   item: VideoItem;
   onDelete: (item: VideoItem) => void;
   onShare: (item: VideoItem) => void;
+  onPress: (item: VideoItem) => void;
 }) {
   return (
-    <View style={styles.card}>
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() => onPress(item)}
+      activeOpacity={0.85}>
       {/* Thumbnail */}
       <View style={styles.thumb}>
         {item.thumbnailPath ? (
@@ -103,12 +113,13 @@ function VideoCard({
         <Text style={styles.metaDate}>{fmtDate(item.dateAdded)}</Text>
         <Text style={styles.metaSize}>{fmtSize(item.size)}</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
 // ─── Screen ────────────────────────────────────────────────────────────────
 export default function VideosScreen() {
+  const navigation = useNavigation<NavProp>();
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -204,7 +215,12 @@ export default function VideosScreen() {
           videos.length === 0 ? styles.emptyContent : styles.listContent
         }
         renderItem={({item}) => (
-          <VideoCard item={item} onDelete={handleDelete} onShare={handleShare} />
+          <VideoCard
+            item={item}
+            onDelete={handleDelete}
+            onShare={handleShare}
+            onPress={handleEdit}
+          />
         )}
         refreshControl={
           <RefreshControl

@@ -468,15 +468,16 @@ class ScreenRecordService : Service() {
         fun dp(v: Int) = (v * density).toInt()
 
         val container = android.widget.FrameLayout(ctx).apply {
-            setBackgroundColor(0xCC1E3A8A.toInt()) // semi-transparent blue (app brand color)
+            setBackgroundColor(android.graphics.Color.TRANSPARENT) // no background, only the number
         }
 
         val numberView = android.widget.TextView(ctx).apply {
             text = "3"
-            setTextColor(android.graphics.Color.WHITE)
-            textSize = 120f
+            setTextColor(0xFF3B82F6.toInt()) // blue number, no background
+            textSize = 140f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = android.view.Gravity.CENTER
+            setShadowLayer(24f, 0f, 0f, 0xFF3B82F6.toInt()) // glow so it's visible on any content
         }
         val labelView = android.widget.TextView(ctx).apply {
             text = "Kayıt başlıyor…"

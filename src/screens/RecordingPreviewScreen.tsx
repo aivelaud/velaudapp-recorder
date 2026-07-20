@@ -116,8 +116,8 @@ export default function RecordingPreviewScreen() {
   }, [filePath, goBack]);
 
   const handleTrim = useCallback(() => {
-    ToastAndroid.show('Video galeri uygulamasında düzenleyin', ToastAndroid.LONG);
-  }, []);
+    navigation.navigate('VideoEditor', {filePath});
+  }, [filePath, navigation]);
 
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
