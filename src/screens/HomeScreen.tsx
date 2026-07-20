@@ -106,14 +106,19 @@ function Chip({
   icon,
   label,
   active,
+  onPress,
 }: {
   icon: string;
   label: string;
   active?: boolean;
+  onPress?: () => void;
 }) {
   return (
-    <View
-      style={[styles.chip, active && styles.chipActive]}>
+    <TouchableOpacity
+      style={[styles.chip, active && styles.chipActive]}
+      onPress={onPress}
+      activeOpacity={onPress ? 0.65 : 1}
+      disabled={!onPress}>
       <Icon
         name={icon}
         size={14}
@@ -122,7 +127,7 @@ function Chip({
       <Text style={[styles.chipText, active && styles.chipTextActive]}>
         {label}
       </Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -293,6 +298,23 @@ export default function HomeScreen() {
     } catch {}
   }, [status.isPaused]);
 
+  // ── Quick-toggle chip handlers ──────────────────────────────────────────
+  const toggleAudio = useCallback(async () => {
+    const updated = {...settings, includeAudio: !settings.includeAudio};
+    setSettings(updated);
+    await SettingsManager.save({includeAudio: updated.includeAudio});
+  }, [settings]);
+
+  const toggleTouches = useCallback(async () => {
+    const updated = {...settings, showTouches: !settings.showTouches};
+    setSettings(updated);
+    await SettingsManager.save({showTouches: updated.showTouches});
+  }, [settings]);
+
+  const goToSettings = useCallback(() => {
+    navigation.getParent()?.navigate('Ayarlar' as never);
+  }, [navigation]);
+
   // ── Derived values ──────────────────────────────────────────────────────
   const resLabel = settings.resolution === 'device' ? 'Cihaz' : settings.resolution;
   const {isRecording, isPaused} = status;
@@ -331,17 +353,19 @@ export default function HomeScreen() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chipsContainer}
         style={styles.chipsScroll}>
-        <Chip icon="quality-high" label={resLabel} />
-        <Chip icon="filmstrip" label={`${settings.fps} FPS`} />
+        <Chip icon="quality-high" label={resLabel} onPress={goToSettings} />
+        <Chip icon="filmstrip" label={`${settings.fps} FPS`} onPress={goToSettings} />
         <Chip
           icon={settings.includeAudio ? 'microphone' : 'microphone-off'}
           label={settings.includeAudio ? 'Ses Açık' : 'Sessiz'}
           active={settings.includeAudio}
+          onPress={toggleAudio}
         />
         <Chip
           icon="gesture-tap"
           label="Dokunma"
           active={settings.showTouches}
+          onPress={toggleTouches}
         />
       </ScrollView>
 

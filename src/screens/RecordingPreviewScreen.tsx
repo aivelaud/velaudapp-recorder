@@ -26,6 +26,9 @@ const {width: W} = Dimensions.get('window');
 const VIDEO_H = W * (9 / 16);
 
 // ─── Action pill ──────────────────────────────────────────────────────────
+// primary=true → full-width standalone button (fixed height, no flex growth)
+// danger=true  → red tinted row pill
+// default      → neutral row pill (flex:1 inside a row)
 function ActionPill({
   icon,
   label,
@@ -39,28 +42,28 @@ function ActionPill({
   danger?: boolean;
   primary?: boolean;
 }) {
+  if (primary) {
+    return (
+      <TouchableOpacity
+        style={styles.pillPrimaryStandalone}
+        onPress={onPress}
+        activeOpacity={0.75}>
+        <Icon name={icon} size={20} color={Colors.white} />
+        <Text style={styles.pillLabelPrimary}>{label}</Text>
+      </TouchableOpacity>
+    );
+  }
   return (
     <TouchableOpacity
-      style={[
-        styles.pill,
-        danger && styles.pillDanger,
-        primary && styles.pillPrimary,
-      ]}
+      style={[styles.pill, danger && styles.pillDanger]}
       onPress={onPress}
       activeOpacity={0.7}>
       <Icon
         name={icon}
-        size={19}
-        color={
-          primary ? Colors.white : danger ? Colors.primary : Colors.textSecondary
-        }
+        size={18}
+        color={danger ? Colors.primary : Colors.textSecondary}
       />
-      <Text
-        style={[
-          styles.pillLabel,
-          danger && styles.pillLabelDanger,
-          primary && styles.pillLabelPrimary,
-        ]}>
+      <Text style={[styles.pillLabel, danger && styles.pillLabelDanger]}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -181,25 +184,17 @@ export default function RecordingPreviewScreen() {
 
       {/* ── Actions ──────────────────────────────────────────────────────── */}
       <View style={styles.actionsWrap}>
-        <Text style={styles.actionsLabel}>İşlemler</Text>
-
-        {/* Primary action: Share */}
+        {/* Primary: Share — full width, fixed height */}
         <ActionPill
           icon="share-variant"
           label="Paylaş"
           onPress={handleShare}
           primary
         />
-
-        {/* Secondary row */}
+        {/* Secondary row: 3 equal-width pills */}
         <View style={styles.actionsRow}>
           <ActionPill icon="content-cut" label="Kırp" onPress={handleTrim} />
-          <ActionPill
-            icon="delete-outline"
-            label="Sil"
-            onPress={handleDelete}
-            danger
-          />
+          <ActionPill icon="delete-outline" label="Sil" onPress={handleDelete} danger />
           <ActionPill icon="check" label="Tamam" onPress={goBack} />
         </View>
       </View>
@@ -301,19 +296,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
 
-  // Actions
+  // Actions section — fixed height, sits at the bottom
   actionsWrap: {
-    flex: 1,
     paddingHorizontal: 16,
-    paddingTop: 20,
+    paddingTop: 14,
+    paddingBottom: 16,
     gap: 10,
-  },
-  actionsLabel: {
-    color: Colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-    marginBottom: 2,
   },
   actionsRow: {
     flexDirection: 'row',
@@ -321,25 +309,32 @@ const styles = StyleSheet.create({
   },
 
   // Pills (Midas-style)
+  // Default pill: used inside a flex row (flex:1 distributes width between siblings)
   pill: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
+    gap: 7,
+    height: 50,
     borderRadius: 14,
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
   },
+  // Primary pill: full width, fixed height — NO flex:1 so it doesn't grow vertically
+  pillPrimaryStandalone: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: Colors.primary,
+  },
   pillDanger: {
     backgroundColor: Colors.primaryMuted,
     borderColor: Colors.chipActiveBorder,
-  },
-  pillPrimary: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.transparent,
   },
   pillLabel: {
     color: Colors.textSecondary,
@@ -351,5 +346,7 @@ const styles = StyleSheet.create({
   },
   pillLabelPrimary: {
     color: Colors.white,
+    fontSize: 15,
+    fontWeight: '800',
   },
 });
