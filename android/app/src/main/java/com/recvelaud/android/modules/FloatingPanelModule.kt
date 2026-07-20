@@ -1,5 +1,6 @@
 package com.recvelaud.android.modules
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
@@ -10,6 +11,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.util.DisplayMetrics
 import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
@@ -17,6 +19,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.facebook.react.bridge.*
@@ -27,6 +30,11 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
 
     companion object {
         private const val TAG = "FloatingPanelModule"
+        private const val PREFS_NAME = "velaud_floating_panel"
+        private const val KEY_POS_X = "pos_x"
+        private const val KEY_POS_Y = "pos_y"
+        private const val DEFAULT_X = 24
+        private const val DEFAULT_Y = 300
     }
 
     override fun getName(): String = "FloatingPanelModule"
@@ -40,6 +48,9 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
     private var pauseBtnIcon: TextView? = null
     private var pauseBtnLabel: TextView? = null
     private var isPanelPaused = false
+    private var smallCircle: View? = null
+    private var expandedPanel: View? = null
+    private var layoutParams: WindowManager.LayoutParams? = null
 
     @ReactMethod
     fun checkOverlayPermission(promise: Promise) {
@@ -78,7 +89,7 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
             Handler(Looper.getMainLooper()).post {
                 try {
                     windowManager = reactContext.getSystemService(
-                        android.content.Context.WINDOW_SERVICE
+                        Context.WINDOW_SERVICE
                     ) as WindowManager
                     panelStartTimeMs = System.currentTimeMillis()
                     isPanelPaused = false
@@ -120,24 +131,54 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
                   else String.format("%02d:%02d", m, s)
     }
 
-    // ── XRecorder-style small draggable circle ─────────────────────────────
+    private fun getScreenWidth(): Int {
+        val metrics = DisplayMetrics()
+        windowManager?.defaultDisplay?.getRealMetrics(metrics)
+        return metrics.widthPixels
+    }
+
+    private fun getScreenHeight(): Int {
+        val metrics = DisplayMetrics()
+        windowManager?.defaultDisplay?.getRealMetrics(metrics)
+        return metrics.heightPixels
+    }
+
+    private fun loadSavedPosition(): Pair<Int, Int> {
+        val prefs = reactContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return Pair(prefs.getInt(KEY_POS_X, DEFAULT_X), prefs.getInt(KEY_POS_Y, DEFAULT_Y))
+    }
+
+    private fun savePosition(x: Int, y: Int) {
+        val prefs = reactContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putInt(KEY_POS_X, x).putInt(KEY_POS_Y, y).apply()
+    }
+
+    private fun clampPosition(x: Int, y: Int, viewWidth: Int, viewHeight: Int): Pair<Int, Int> {
+        val screenW = getScreenWidth()
+        val screenH = getScreenHeight()
+        val clampedX = x.coerceIn(0, (screenW - viewWidth).coerceAtLeast(0))
+        val clampedY = y.coerceIn(0, (screenH - viewHeight).coerceAtLeast(0))
+        return Pair(clampedX, clampedY)
+    }
+
+    // ── XRecorder-style small draggable circle with Velaud app icon ─────────
     private fun buildAndShowPanel() {
         val ctx = reactContext.applicationContext
 
         val container = FrameLayout(ctx)
 
-        // Collapsed: small red circle (XRecorder style)
+        // Collapsed: small circle with Velaud app icon
         val circle = buildSmallCircle(ctx)
         container.addView(circle)
+        smallCircle = circle
 
         // Expanded: control panel
-        val expandedPanel = buildExpandedPanel(ctx)
-        expandedPanel.visibility = View.GONE
-        container.addView(expandedPanel)
+        val expanded = buildExpandedPanel(ctx)
+        expanded.visibility = View.GONE
+        container.addView(expanded)
+        expandedPanel = expanded
 
-        var downX = 0f
-        var downY = 0f
-        var isDragging = false
+        val (savedX, savedY) = loadSavedPosition()
 
         val params = WindowManager.LayoutParams().apply {
             type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -149,11 +190,16 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
                     WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
             width = WindowManager.LayoutParams.WRAP_CONTENT
             height = WindowManager.LayoutParams.WRAP_CONTENT
-            gravity = Gravity.TOP or Gravity.END
-            x = 12
-            y = 300
+            gravity = Gravity.TOP or Gravity.START
+            x = savedX
+            y = savedY
             format = PixelFormat.TRANSLUCENT
         }
+        layoutParams = params
+
+        var downX = 0f
+        var downY = 0f
+        var isDragging = false
 
         container.setOnTouchListener { _, event ->
             when (event.action) {
@@ -165,19 +211,29 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
                     val dy = event.rawY - downY
                     if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
                         isDragging = true
-                        params.x = (params.x - dx).toInt()
-                        params.y = (params.y + dy).toInt()
-                        params.gravity = Gravity.TOP or Gravity.START
+                        // FIX: Both axes now move in the same direction as the finger.
+                        // Previously x was inverted (params.x - dx) causing opposite movement.
+                        val newSize = container.width.coerceAtLeast(48.dp(ctx))
+                        val (cx, cy) = clampPosition(
+                            params.x + dx.toInt(),
+                            params.y + dy.toInt(),
+                            newSize,
+                            newSize
+                        )
+                        params.x = cx
+                        params.y = cy
                         downX = event.rawX; downY = event.rawY
                         try { windowManager?.updateViewLayout(container, params) } catch (_: Exception) {}
                     }
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (!isDragging) {
+                    if (isDragging) {
+                        savePosition(params.x, params.y)
+                    } else {
                         isExpanded = !isExpanded
                         circle.visibility = if (isExpanded) View.GONE else View.VISIBLE
-                        expandedPanel.visibility = if (isExpanded) View.VISIBLE else View.GONE
+                        expanded.visibility = if (isExpanded) View.VISIBLE else View.GONE
                         if (isExpanded) startDurationTimer()
                     }
                     true
@@ -188,71 +244,121 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
 
         windowManager?.addView(container, params)
         floatingView = container
+
+        // Ensure the panel starts within screen bounds
+        container.post {
+            val (cx, cy) = clampPosition(params.x, params.y, container.width, container.height)
+            if (cx != params.x || cy != params.y) {
+                params.x = cx
+                params.y = cy
+                try { windowManager?.updateViewLayout(container, params) } catch (_: Exception) {}
+                savePosition(cx, cy)
+            }
+        }
     }
 
-    // ── Small red circle (XRecorder collapsed state) ───────────────────────
-    private fun buildSmallCircle(ctx: android.content.Context): View {
-        val size = 48.dp(ctx)
-        val circle = View(ctx).apply {
+    // ── Small circle with Velaud app icon (XRecorder collapsed state) ────────
+    private fun buildSmallCircle(ctx: Context): View {
+        val size = 52.dp(ctx)
+        val wrapper = FrameLayout(ctx).apply {
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#FF4757"))
-                setStroke(3, Color.WHITE)
+                setColor(0xE6161620.toInt())
+                setStroke(2, 0x55FFFFFF.toInt())
             }
         }
 
-        // Pulsing animation
-        android.animation.ObjectAnimator.ofFloat(circle, "scaleX", 1f, 1.15f, 1f).apply {
-            duration = 1200
+        // Use the Velaud app icon (ic_launcher_foreground) instead of ugly red circle
+        val icon = ImageView(ctx).apply {
+            setImageResource(
+                ctx.resources.getIdentifier("ic_launcher_foreground", "mipmap", ctx.packageName)
+            )
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            clipToOutline = true
+            outline = android.graphics.Outline().apply {
+                setOval(0, 0, size - 8.dp(ctx), size - 8.dp(ctx))
+            }
+        }
+
+        val iconSize = size - 8.dp(ctx)
+        val iconLp = FrameLayout.LayoutParams(iconSize, iconSize).apply {
+            gravity = Gravity.CENTER
+        }
+        wrapper.addView(icon, iconLp)
+
+        // Subtle pulsing ring around the icon
+        val ring = View(ctx).apply {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.TRANSPARENT)
+                setStroke(2, 0x443B82F6.toInt())
+            }
+            alpha = 0.6f
+        }
+        val ringSize = size + 6.dp(ctx)
+        wrapper.addView(ring, FrameLayout.LayoutParams(ringSize, ringSize).apply {
+            gravity = Gravity.CENTER
+        })
+
+        android.animation.ObjectAnimator.ofFloat(ring, "scaleX", 1f, 1.15f, 1f).apply {
+            duration = 1800
             repeatCount = android.animation.ObjectAnimator.INFINITE
             start()
         }
-        android.animation.ObjectAnimator.ofFloat(circle, "scaleY", 1f, 1.15f, 1f).apply {
-            duration = 1200
+        android.animation.ObjectAnimator.ofFloat(ring, "scaleY", 1f, 1.15f, 1f).apply {
+            duration = 1800
+            repeatCount = android.animation.ObjectAnimator.INFINITE
+            start()
+        }
+        android.animation.ObjectAnimator.ofFloat(ring, "alpha", 0.5f, 0.15f, 0.5f).apply {
+            duration = 1800
             repeatCount = android.animation.ObjectAnimator.INFINITE
             start()
         }
 
-        val wrapper = FrameLayout(ctx).apply {
-            addView(circle, FrameLayout.LayoutParams(size, size).apply { gravity = Gravity.CENTER })
-        }
         return wrapper
     }
 
-    // ── Expanded control panel (XRecorder style) ───────────────────────────
-    private fun buildExpandedPanel(ctx: android.content.Context): View {
+    // ── Expanded control panel (XRecorder style - clean, no overlap) ────────
+    private fun buildExpandedPanel(ctx: Context): View {
         val panel = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(10.dp(ctx), 12.dp(ctx), 10.dp(ctx), 12.dp(ctx))
+            setPadding(16.dp(ctx), 14.dp(ctx), 16.dp(ctx), 14.dp(ctx))
             background = GradientDrawable().apply {
-                setColor(0xF0161620.toInt())
-                cornerRadius = 28f
+                setColor(0xF0181825.toInt())
+                cornerRadius = 24f
                 setStroke(1, 0x33FFFFFF.toInt())
             }
         }
 
-        // Duration text
+        // Duration text at top
         val durationTv = TextView(ctx).apply {
             text = "00:00"
             setTextColor(Color.WHITE)
-            textSize = 20f
+            textSize = 22f
             typeface = Typeface.MONOSPACE
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 12.dp(ctx))
+            setPadding(0, 0, 0, 14.dp(ctx))
         }
         panel.addView(durationTv)
         durationTextView = durationTv
+
+        // Horizontal row of buttons — clean, evenly spaced, no overlap
+        val buttonRow = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 0)
+        }
 
         // Stop button
         val stopBtn = buildCircleButton(ctx, "\u23F9", "Durdur", 0xFFFF4757.toInt()) {
             sendServiceAction(ScreenRecordService.ACTION_STOP)
             Handler(Looper.getMainLooper()).postDelayed({ removePanel() }, 300)
         }
-        val stopLp = LinearLayout.LayoutParams(
+        buttonRow.addView(stopBtn, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = 10.dp(ctx) }
-        panel.addView(stopBtn, stopLp)
+        ).apply { marginEnd = 16.dp(ctx) })
 
         // Pause/Resume
         val pauseBtn = buildCircleButton(ctx, "\u23F8", "Duraklat", 0xFFFFA500.toInt()) {
@@ -266,40 +372,35 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
         }
         pauseBtnIcon = pauseBtn.getChildAt(0) as? TextView
         pauseBtnLabel = pauseBtn.getChildAt(1) as? TextView
-        val pauseLp = LinearLayout.LayoutParams(
+        buttonRow.addView(pauseBtn, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = 10.dp(ctx) }
-        panel.addView(pauseBtn, pauseLp)
+        ).apply { marginEnd = 16.dp(ctx) })
 
         // Home (open app)
-        val homeBtn = buildCircleButton(ctx, "\u2302", "Uygulama", 0xFF2A2A3A.toInt()) {
+        val homeBtn = buildCircleButton(ctx, "\u2302", "Uygulama", 0xFF3B82F6.toInt()) {
             val intent = reactContext.packageManager
                 .getLaunchIntentForPackage(reactContext.packageName)
             intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             if (intent != null) reactContext.startActivity(intent)
         }
-        val homeLp = LinearLayout.LayoutParams(
+        buttonRow.addView(homeBtn, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = 10.dp(ctx) }
-        panel.addView(homeBtn, homeLp)
+        ).apply { marginEnd = 16.dp(ctx) })
 
-        // Close (minimize)
-        panel.addView(buildCircleButton(ctx, "\u2715", "Kapat", 0xFF2A2A3A.toInt()) {
+        // Close (minimize back to small circle)
+        buttonRow.addView(buildCircleButton(ctx, "\u2715", "Kapat", 0xFF444466.toInt()) {
             isExpanded = false
-            val parent = panel.parent as? ViewGroup
-            parent?.let { p ->
-                for (i in 0 until p.childCount) {
-                    val child = p.getChildAt(i)
-                    child.visibility = if (child == panel) View.GONE else View.VISIBLE
-                }
-            }
+            smallCircle?.visibility = View.VISIBLE
+            expandedPanel?.visibility = View.GONE
         })
+
+        panel.addView(buttonRow)
 
         return panel
     }
 
     private fun buildCircleButton(
-        ctx: android.content.Context,
+        ctx: Context,
         icon: String,
         label: String,
         bgColor: Int,
@@ -313,22 +414,22 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
         val circle = TextView(ctx).apply {
             text = icon
             setTextColor(Color.WHITE)
-            textSize = 18f
+            textSize = 20f
             gravity = Gravity.CENTER
             setBackgroundDrawable(GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(bgColor)
                 setStroke(1, 0x33FFFFFF.toInt())
             })
-            layoutParams = LinearLayout.LayoutParams(44.dp(ctx), 44.dp(ctx)).apply {
+            layoutParams = LinearLayout.LayoutParams(48.dp(ctx), 48.dp(ctx)).apply {
                 gravity = Gravity.CENTER
             }
         }
         val lbl = TextView(ctx).apply {
             text = label
             setTextColor(0xFFB0B0C0.toInt())
-            textSize = 9f
-            setPadding(0, 4.dp(ctx), 0, 0)
+            textSize = 10f
+            setPadding(0, 5.dp(ctx), 0, 0)
             gravity = Gravity.CENTER
         }
         col.addView(circle)
@@ -349,13 +450,15 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
         durationTextView = null
         pauseBtnIcon = null
         pauseBtnLabel = null
+        smallCircle = null
+        expandedPanel = null
         val v = floatingView ?: return
         try { windowManager?.removeView(v) } catch (_: Exception) {}
         floatingView = null
         isExpanded = false
     }
 
-    private fun Int.dp(ctx: android.content.Context): Int =
+    private fun Int.dp(ctx: Context): Int =
         (this * ctx.resources.displayMetrics.density).toInt()
 
     @ReactMethod fun addListener(eventName: String) {}

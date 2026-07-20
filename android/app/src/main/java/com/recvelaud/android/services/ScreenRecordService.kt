@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.hardware.display.DisplayManager
@@ -20,6 +21,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
+import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.facebook.react.bridge.Arguments
@@ -132,8 +134,16 @@ class ScreenRecordService : Service() {
             @Suppress("DEPRECATION")
             intent.getParcelableExtra(EXTRA_RESULT_DATA)
         }
-        val width = intent.getIntExtra(EXTRA_WIDTH, 1920)
-        val height = intent.getIntExtra(EXTRA_HEIGHT, 1080)
+        // FIX: Use real device screen dimensions when caller passes 0/invalid values.
+        // Previously defaulted to 1920x1080 (PC-style) which produced desktop-aspect videos
+        // on phones. Now we honor the actual phone display resolution.
+        val metrics = resources.displayMetrics
+        val defaultW = metrics.widthPixels
+        val defaultH = metrics.heightPixels
+        val reqW = intent.getIntExtra(EXTRA_WIDTH, 0)
+        val reqH = intent.getIntExtra(EXTRA_HEIGHT, 0)
+        val width = if (reqW > 0) reqW else defaultW
+        val height = if (reqH > 0) reqH else defaultH
         val fps = intent.getIntExtra(EXTRA_FPS, 30)
         val includeAudio = intent.getBooleanExtra(EXTRA_INCLUDE_AUDIO, true)
 
@@ -281,18 +291,23 @@ class ScreenRecordService : Service() {
                 throw Exception("VirtualDisplay oluşturulamadı")
             }
 
-            Log.d(TAG, "Calling start()…")
-            mediaRecorder?.start()
-            Log.i(TAG, "Recording started successfully → $outputFilePath")
+            // ── 3-second countdown overlay before recording starts ─────────
+            // Shows a blue (app brand color) full-screen countdown 3→2→1,
+            // then begins the actual recording.
+            showCountdownOverlay {
+                Log.d(TAG, "Calling start()…")
+                mediaRecorder?.start()
+                Log.i(TAG, "Recording started successfully → $outputFilePath")
 
-            isRecording = true
-            isPaused = false
-            startTimeMs = System.currentTimeMillis()
-            pausedDurationMs = 0L
+                isRecording = true
+                isPaused = false
+                startTimeMs = System.currentTimeMillis()
+                pausedDurationMs = 0L
 
-            updateNotification("⏺ Ekran kaydediliyor…")
-            startDurationTimer()
-            emitStatus()
+                updateNotification("⏺ Ekran kaydediliyor…")
+                startDurationTimer()
+                emitStatus()
+            }
 
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start recording: ${e::class.simpleName}: ${e.message}", e)
@@ -437,6 +452,93 @@ class ScreenRecordService : Service() {
                 }
             }
         }, 1000L, 1000L)
+    }
+
+    // ── 3-second blue countdown overlay (3 → 2 → 1) before recording starts ─
+    private fun showCountdownOverlay(onComplete: () -> Unit) {
+        val ctx = reactContext ?: run { onComplete(); return }
+        val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
+        if (wm == null || !Settings.canDrawOverlays(ctx)) {
+            onComplete()
+            return
+        }
+
+        val density = ctx.resources.displayMetrics.density
+        fun dp(v: Int) = (v * density).toInt()
+
+        val container = android.widget.FrameLayout(ctx).apply {
+            setBackgroundColor(0xCC1E3A8A.toInt()) // semi-transparent blue (app brand color)
+        }
+
+        val numberView = android.widget.TextView(ctx).apply {
+            text = "3"
+            setTextColor(android.graphics.Color.WHITE)
+            textSize = 120f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = android.view.Gravity.CENTER
+        }
+        val labelView = android.widget.TextView(ctx).apply {
+            text = "Kayıt başlıyor…"
+            setTextColor(0xFFCCCCCC.toInt())
+            textSize = 16f
+            gravity = android.view.Gravity.CENTER
+        }
+
+        val textCol = android.widget.LinearLayout(ctx).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            gravity = android.view.Gravity.CENTER
+        }
+        textCol.addView(numberView)
+        textCol.addView(labelView, android.widget.LinearLayout.LayoutParams(
+            android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+            android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(16) })
+        container.addView(textCol, android.widget.FrameLayout.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT
+        ))
+
+        val params = android.view.WindowManager.LayoutParams().apply {
+            type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            else
+                @Suppress("DEPRECATION") android.view.WindowManager.LayoutParams.TYPE_SYSTEM_OVERLAY
+            flags = android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+            width = android.view.WindowManager.LayoutParams.MATCH_PARENT
+            height = android.view.WindowManager.LayoutParams.MATCH_PARENT
+            format = android.graphics.PixelFormat.TRANSLUCENT
+            gravity = android.view.Gravity.CENTER
+        }
+
+        try { wm.addView(container, params) } catch (e: Exception) {
+            Log.e(TAG, "Countdown overlay addView failed", e)
+            onComplete()
+            return
+        }
+
+        var count = 3
+        val countdownHandler = Handler(Looper.getMainLooper())
+        val tick = object : Runnable {
+            override fun run() {
+                count--
+                if (count > 0) {
+                    numberView.text = count.toString()
+                    // Scale animation for pulse effect
+                    numberView.scaleX = 0.5f; numberView.scaleY = 0.5f
+                    numberView.animate().scaleX(1f).scaleY(1f).setDuration(300).start()
+                    countdownHandler.postDelayed(this, 1000L)
+                } else {
+                    try { wm.removeView(container) } catch (_: Exception) {}
+                    onComplete()
+                }
+            }
+        }
+
+        // Initial scale-in animation for "3"
+        numberView.scaleX = 0.5f; numberView.scaleY = 0.5f
+        numberView.animate().scaleX(1f).scaleY(1f).setDuration(400).start()
+        countdownHandler.postDelayed(tick, 1000L)
     }
 
     private fun updateNotificationWithDuration() {

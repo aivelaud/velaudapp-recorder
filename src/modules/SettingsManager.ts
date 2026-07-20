@@ -9,7 +9,7 @@ export interface AppSettings {
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
-  resolution: '1080p',
+  resolution: 'device',
   fps: 30,
   includeAudio: true,
   showTouches: false,
