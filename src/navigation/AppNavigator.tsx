@@ -7,6 +7,7 @@ import {Colors} from '../theme/colors';
 import HomeScreen from '../screens/HomeScreen';
 import VideosScreen from '../screens/VideosScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import RecordingPreviewScreen from '../screens/RecordingPreviewScreen';
 
 export type RootTabParamList = {
   Record: undefined;
@@ -16,6 +17,7 @@ export type RootTabParamList = {
 export type RootStackParamList = {
   Main: undefined;
   Settings: undefined;
+  RecordingPreview: {filePath: string};
 };
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -100,6 +102,14 @@ function AppNavigator() {
           headerTitleStyle: {fontWeight: '700', fontSize: 18},
           headerBackTitle: '',
           headerShadowVisible: false,
+        }}
+      />
+      <Stack.Screen
+        name="RecordingPreview"
+        component={RecordingPreviewScreen}
+        options={{
+          presentation: 'card',
+          headerShown: false,
         }}
       />
     </Stack.Navigator>

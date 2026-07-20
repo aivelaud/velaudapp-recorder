@@ -16,6 +16,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Colors} from '../theme/colors';
 import {VideoLibrary, VideoItem} from '../modules/VideoLibraryModule';
+import {Recorder} from '../modules/RecorderModule';
 
 const formatDuration = (ms: number): string => {
   const totalSec = Math.floor(ms / 1000);
@@ -143,6 +144,18 @@ export default function VideosScreen() {
 
   useEffect(() => {
     loadVideos().finally(() => setLoading(false));
+  }, [loadVideos]);
+
+  // FIX (SORUN 5): Auto-refresh gallery when a new recording is saved,
+  // without requiring the user to restart the app.
+  useEffect(() => {
+    const savedSub = Recorder.onRecordingSaved(_filePath => {
+      // Small delay to allow MediaStore to finalize the file
+      setTimeout(() => {
+        loadVideos();
+      }, 800);
+    });
+    return () => savedSub.remove();
   }, [loadVideos]);
 
   const onRefresh = useCallback(async () => {

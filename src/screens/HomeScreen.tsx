@@ -56,10 +56,18 @@ export default function HomeScreen() {
     SettingsManager.load().then(setSettings);
 
     const statusSub = Recorder.onRecordingStatus(s => setStatus(s));
-    const savedSub = Recorder.onRecordingSaved(_filePath => {
-      ToastAndroid.show('Video başarıyla kaydedildi!', ToastAndroid.SHORT);
+
+    // FIX (SORUN 6): Navigate to preview screen when recording is saved
+    const savedSub = Recorder.onRecordingSaved((filePath: string) => {
+      if (filePath && filePath.length > 0) {
+        ToastAndroid.show('Video kaydedildi!', ToastAndroid.SHORT);
+        navigation.navigate('RecordingPreview', {filePath});
+      } else {
+        ToastAndroid.show('Video başarıyla kaydedildi!', ToastAndroid.SHORT);
+      }
     });
-    const errorSub = Recorder.onRecordingError(err => {
+
+    const errorSub = Recorder.onRecordingError((err: string) => {
       Alert.alert('Kayıt Hatası', err);
     });
 
@@ -78,7 +86,7 @@ export default function HomeScreen() {
       savedSub.remove();
       errorSub.remove();
     };
-  }, []);
+  }, [navigation]);
 
   useEffect(() => {
     if (status.isRecording && !status.isPaused) {
@@ -192,7 +200,7 @@ export default function HomeScreen() {
     try {
       await Recorder.stopRecording();
       await FloatingPanel.hidePanel();
-      ToastAndroid.show('Kayıt durduruldu', ToastAndroid.SHORT);
+      // Navigation to preview happens via RecordingSaved event listener
     } catch (e: any) {
       console.error('Stop recording error:', e);
     }
@@ -352,7 +360,7 @@ export default function HomeScreen() {
 
       {/* Bottom Info */}
       <View style={styles.bottomBar}>
-        <Text style={styles.versionText}>Velaud Recorder v2.0.0</Text>
+        <Text style={styles.versionText}>Velaud Recorder v2.1.0</Text>
       </View>
     </SafeAreaView>
   );

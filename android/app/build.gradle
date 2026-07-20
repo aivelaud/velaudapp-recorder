@@ -2,6 +2,10 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+// FIX (SORUN 1): Copy react-native-vector-icons font files into assets.
+// Without this, font TTF files are never bundled → icons render as blank squares.
+apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
+
 react {
     /* Hermes is now part of react-native */
 }
@@ -16,8 +20,8 @@ android {
         applicationId "com.recvelaud.android"
         minSdk rootProject.ext.minSdkVersion
         targetSdk rootProject.ext.targetSdkVersion
-        versionCode 11
-        versionName "2.0.0"
+        versionCode 12
+        versionName "2.1.0"
         multiDexEnabled true
     }
 

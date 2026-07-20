@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.ContentValues
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.MediaRecorder
@@ -17,6 +18,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -59,6 +61,10 @@ class ScreenRecordService : Service() {
     private var virtualDisplay: VirtualDisplay? = null
     private var mediaRecorder: MediaRecorder? = null
     private var outputFilePath: String? = null
+    // CRITICAL FIX: Keep ParcelFileDescriptor open for the entire recording session.
+    // Closing it (via use{}) before stop() causes MediaRecorder to lose write access
+    // on some Samsung/Android 14 devices → 0-byte output file.
+    private var outputPfd: ParcelFileDescriptor? = null
     private var isRecording = false
     private var isPaused = false
     private var startTimeMs = 0L
@@ -77,7 +83,6 @@ class ScreenRecordService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Service can be killed by the system — release everything
         try {
             durationTimer?.cancel()
             durationTimer = null
@@ -89,12 +94,14 @@ class ScreenRecordService : Service() {
             val cbDestroy = projectionCallback
             if (cbDestroy != null) { mediaProjection?.unregisterCallback(cbDestroy) }
             mediaProjection?.stop()
+            try { outputPfd?.close() } catch (_: Exception) {}
         } catch (_: Exception) {
         } finally {
             mediaRecorder = null
             virtualDisplay = null
             mediaProjection = null
             projectionCallback = null
+            outputPfd = null
             isRecording = false
             isPaused = false
         }
@@ -131,12 +138,12 @@ class ScreenRecordService : Service() {
         val includeAudio = intent.getBooleanExtra(EXTRA_INCLUDE_AUDIO, true)
 
         if (resultCode != android.app.Activity.RESULT_OK) {
-            Log.e(TAG, "Invalid result code for MediaProjection: $resultCode (expected ${android.app.Activity.RESULT_OK})")
+            Log.e(TAG, "Invalid result code for MediaProjection: $resultCode")
             emitError("Ekran kaydı izni reddedildi")
             stopSelf()
             return
         }
-        
+
         if (resultData == null) {
             Log.e(TAG, "No result data for MediaProjection")
             emitError("Kayıt izni verisi bulunamadı")
@@ -144,28 +151,42 @@ class ScreenRecordService : Service() {
             return
         }
 
-        // CRITICAL: Start foreground IMMEDIATELY before any other work.
-        // On Android 12+ the system kills the service if startForeground()
-        // is not called within ~5 seconds of startForegroundService().
-        startForeground(NOTIF_ID, buildNotification("Kayıt hazırlanıyor…"))
+        // CRITICAL FIX (Android 10+ / Android 14 enforcement):
+        // startForeground MUST include FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION when the
+        // manifest declares foregroundServiceType="mediaProjection".
+        // Without this, on Android 14+ (API 34) getMediaProjection() throws SecurityException,
+        // and on Android 10-13 the OS may silently stop the projection.
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIF_ID,
+                    buildNotification("Kayıt hazırlanıyor…"),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                )
+            } else {
+                startForeground(NOTIF_ID, buildNotification("Kayıt hazırlanıyor…"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "startForeground failed: ${e::class.simpleName}: ${e.message}", e)
+            emitError("Ön plan servisi başlatılamadı: ${e.message}")
+            stopSelf()
+            return
+        }
 
         try {
             val projManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjection = projManager.getMediaProjection(resultCode, resultData)
-            
+
             if (mediaProjection == null) {
-                Log.e(TAG, "MediaProjection is null after creation")
-                emitError("Ekran kaydı başlatılamadı")
+                Log.e(TAG, "MediaProjection is null after creation — likely Android 14 type enforcement")
+                emitError("Ekran kaydı başlatılamadı (MediaProjection null)")
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 return
             }
 
-            // CRITICAL (Android 14 / API 34+): Register a MediaProjection.Callback
-            // BEFORE creating the VirtualDisplay. Without this, the OS can invalidate
-            // the projection session at any time (e.g. when the app is backgrounded
-            // or another app comes to the foreground). This is the PRIMARY fix for
-            // "recording doesn't work in background / other apps" bug.
+            // CRITICAL (Android 14 / API 34+): Register MediaProjection.Callback BEFORE
+            // creating VirtualDisplay. Without this, the OS invalidates the session.
             projectionCallback = object : MediaProjection.Callback() {
                 override fun onStop() {
                     Log.w(TAG, "MediaProjection.onStop() — projection revoked by system/user")
@@ -193,7 +214,6 @@ class ScreenRecordService : Service() {
                     setVideoSource(MediaRecorder.VideoSource.SURFACE)
                     setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
 
-                    // Output file via MediaStore (scoped storage)
                     val fileName = "VelaudRec_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())}.mp4"
 
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -204,17 +224,21 @@ class ScreenRecordService : Service() {
                             put(MediaStore.Video.Media.IS_PENDING, 1)
                         }
                         val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
-                        if (uri == null) {
-                            throw Exception("MediaStore URI oluşturulamadı")
-                        }
+                            ?: throw Exception("MediaStore URI oluşturulamadı")
                         outputFilePath = uri.toString()
-                        contentResolver.openFileDescriptor(uri, "w")?.use { pfd ->
-                            setOutputFile(pfd.fileDescriptor)
-                        } ?: throw Exception("FileDescriptor açılamadı")
+
+                        // CRITICAL FIX: Do NOT use use{} — keep the ParcelFileDescriptor open
+                        // for the entire recording session. Close it only in stopRecording() / cleanup.
+                        // Using use{} closes the fd right after setOutputFile(), which on some devices
+                        // causes MediaRecorder to write 0 bytes.
+                        val pfd = contentResolver.openFileDescriptor(uri, "rw")
+                            ?: throw Exception("FileDescriptor açılamadı")
+                        outputPfd = pfd
+                        setOutputFile(pfd.fileDescriptor)
                     } else {
                         val dir = android.os.Environment.getExternalStoragePublicDirectory(
                             android.os.Environment.DIRECTORY_MOVIES
-                        ).resolve("VelaudRecorder").also { 
+                        ).resolve("VelaudRecorder").also {
                             if (!it.exists() && !it.mkdirs()) {
                                 throw Exception("Kayıt klasörü oluşturulamadı")
                             }
@@ -233,27 +257,34 @@ class ScreenRecordService : Service() {
                     setVideoEncodingBitRate(8_000_000)
                     setVideoFrameRate(fps)
                     setVideoSize(width, height)
+
+                    Log.d(TAG, "Calling prepare()…")
                     prepare()
+                    Log.d(TAG, "prepare() succeeded")
                 } catch (e: Exception) {
-                    Log.e(TAG, "MediaRecorder setup failed", e)
+                    Log.e(TAG, "MediaRecorder setup failed: ${e::class.simpleName}: ${e.message}", e)
                     throw e
                 }
             }
 
-            // Create VirtualDisplay
+            // Create VirtualDisplay — must use getSurface() AFTER prepare()
             val screenDensity = resources.displayMetrics.densityDpi
+            Log.d(TAG, "Creating VirtualDisplay ${width}x${height} density=$screenDensity")
             virtualDisplay = mediaProjection?.createVirtualDisplay(
                 "VelaudCapture",
                 width, height, screenDensity,
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                 mediaRecorder?.surface, null, null
             )
-            
+
             if (virtualDisplay == null) {
                 throw Exception("VirtualDisplay oluşturulamadı")
             }
 
+            Log.d(TAG, "Calling start()…")
             mediaRecorder?.start()
+            Log.i(TAG, "Recording started successfully → $outputFilePath")
+
             isRecording = true
             isPaused = false
             startTimeMs = System.currentTimeMillis()
@@ -263,30 +294,32 @@ class ScreenRecordService : Service() {
             startDurationTimer()
             emitStatus()
 
-            Log.i(TAG, "Recording started successfully → $outputFilePath")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start recording", e)
+            Log.e(TAG, "Failed to start recording: ${e::class.simpleName}: ${e.message}", e)
             val errorMsg = when {
-                e.message?.contains("prepare") == true -> "MediaRecorder hazırlanamadı"
-                e.message?.contains("permission") == true -> "Gerekli izinler verilmemiş"
-                e.message?.contains("MediaStore") == true -> "Video dosyası oluşturulamadı"
-                else -> e.message ?: "Bilinmeyen hata"
+                e.message?.contains("prepare", ignoreCase = true) == true -> "MediaRecorder hazırlanamadı: ${e.message}"
+                e.message?.contains("permission", ignoreCase = true) == true -> "Gerekli izinler verilmemiş"
+                e.message?.contains("MediaStore", ignoreCase = true) == true -> "Video dosyası oluşturulamadı"
+                e.message?.contains("SecurityException", ignoreCase = true) == true -> "Güvenlik hatası: ${e.message}"
+                !e.message.isNullOrBlank() -> e.message!!
+                else -> "Kayıt başlatılamadı (${e::class.simpleName})"
             }
             emitError(errorMsg)
-            
-            // Cleanup on error
+
             try {
                 mediaRecorder?.release()
                 virtualDisplay?.release()
                 val cbErr = projectionCallback
                 if (cbErr != null) { mediaProjection?.unregisterCallback(cbErr) }
                 mediaProjection?.stop()
+                outputPfd?.close()
             } catch (_: Exception) {}
-            
+
             mediaRecorder = null
             virtualDisplay = null
             mediaProjection = null
             projectionCallback = null
+            outputPfd = null
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
@@ -309,6 +342,11 @@ class ScreenRecordService : Service() {
             mediaProjection?.stop()
             mediaProjection = null
             projectionCallback = null
+
+            // Close the ParcelFileDescriptor now that recording is done
+            try { outputPfd?.close() } catch (_: Exception) {}
+            outputPfd = null
+
             isRecording = false
             isPaused = false
 
@@ -317,19 +355,24 @@ class ScreenRecordService : Service() {
             if (path != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
                 path.startsWith("content://")
             ) {
-                val uri = android.net.Uri.parse(path)
-                val values = ContentValues().apply {
-                    put(MediaStore.Video.Media.IS_PENDING, 0)
+                try {
+                    val uri = android.net.Uri.parse(path)
+                    val values = ContentValues().apply {
+                        put(MediaStore.Video.Media.IS_PENDING, 0)
+                    }
+                    contentResolver.update(uri, values, null, null)
+                    Log.i(TAG, "MediaStore IS_PENDING cleared for $path")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to clear IS_PENDING: ${e.message}")
                 }
-                contentResolver.update(uri, values, null, null)
             }
 
             emitSaved(outputFilePath ?: "")
             emitStatus()
             Log.i(TAG, "Recording stopped, saved: $outputFilePath")
         } catch (e: Exception) {
-            Log.e(TAG, "Error stopping recording", e)
-            emitError(e.message ?: "Durdurulamadı")
+            Log.e(TAG, "Error stopping recording: ${e::class.simpleName}: ${e.message}", e)
+            emitError("Kayıt durdurulamadı: ${e.message ?: e::class.simpleName}")
         } finally {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -392,11 +435,7 @@ class ScreenRecordService : Service() {
         val m = (totalSec % 3600) / 60
         val s = totalSec % 60
         val timeStr = String.format("%02d:%02d:%02d", h, m, s)
-        val text = if (isPaused) {
-            "Duraklatıldı - $timeStr"
-        } else {
-            "Kayıt yapılıyor - $timeStr"
-        }
+        val text = if (isPaused) "Duraklatıldı - $timeStr" else "Kayıt yapılıyor - $timeStr"
         updateNotification(text)
     }
 
@@ -456,8 +495,8 @@ class ScreenRecordService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val pauseIntent = Intent(this, ScreenRecordService::class.java).apply { 
-            action = if (isPaused) ACTION_RESUME else ACTION_PAUSE 
+        val pauseIntent = Intent(this, ScreenRecordService::class.java).apply {
+            action = if (isPaused) ACTION_RESUME else ACTION_PAUSE
         }
         val pausePending = PendingIntent.getService(
             this, 1, pauseIntent,
