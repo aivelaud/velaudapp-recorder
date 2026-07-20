@@ -23,6 +23,7 @@ import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Log
+import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReactApplicationContext

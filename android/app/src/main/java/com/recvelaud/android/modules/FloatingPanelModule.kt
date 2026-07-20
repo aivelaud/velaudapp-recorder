@@ -275,8 +275,11 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
             )
             scaleType = ImageView.ScaleType.CENTER_CROP
             clipToOutline = true
-            outline = android.graphics.Outline().apply {
-                setOval(0, 0, size - 8.dp(ctx), size - 8.dp(ctx))
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: android.graphics.Outline) {
+                    val s = view.width.coerceAtMost(view.height)
+                    outline.setOval(0, 0, s, s)
+                }
             }
         }
 
