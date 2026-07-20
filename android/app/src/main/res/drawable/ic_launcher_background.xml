@@ -4,8 +4,7 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Kaynak görüntüden örneklenen renk: #EB6E4C -->
     <path
-        android:fillColor="#EB6E4C"
-        android:pathData="M0,0 L108,0 L108,108 L0,108 Z" />
+        android:fillColor="#6C63FF"
+        android:pathData="M0,0h108v108h-108z" />
 </vector>
