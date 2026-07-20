@@ -1,47 +1,55 @@
+/**
+ * Velaud Recorder — Design System
+ * Midas-inspired true-black base, single red brand color.
+ * One accent = one meaning: RED = kayıt / brand identity.
+ */
 export const Colors = {
-  // Modern dark theme - premium feel
-  background: '#0A0A0F',
-  surface: '#14141F',
-  surfaceElevated: '#1E1E2E',
-  surfaceHighlight: '#252540',
+  // Base surfaces — true dark (Midas-style)
+  background:        '#080808',
+  surface:           '#111111',
+  surfaceElevated:   '#1A1A1A',
+  surfaceHighlight:  '#222222',
+  overlay:           'rgba(0,0,0,0.72)',
 
-  // Brand colors - vibrant gradient feel
-  primary: '#6C63FF',
-  primaryDark: '#4A42D4',
-  primaryLight: '#8B83FF',
-  accent: '#FF6B6B',
-  accentDark: '#E04545',
+  // Brand — single red, doubles as record color (XRecorder principle)
+  primary:           '#FF3B30',
+  primaryDark:       '#CC2E25',
+  primaryLight:      '#FF6B63',
+  primaryMuted:      'rgba(255,59,48,0.12)',
+  primaryGlow:       'rgba(255,59,48,0.25)',
 
   // Text hierarchy
-  text: '#FFFFFF',
-  textSecondary: '#B0B0C8',
-  textMuted: '#6B6B80',
-  textDisabled: '#404050',
+  text:              '#FFFFFF',
+  textSecondary:     '#ADADAD',
+  textMuted:         '#5A5A5A',
+  textDisabled:      '#333333',
 
-  // Borders & dividers
-  border: '#2A2A3E',
-  borderLight: '#3A3A50',
+  // Borders (very subtle on dark)
+  border:            '#242424',
+  borderLight:       '#303030',
+  borderFocus:       '#444444',
 
-  // Status colors
-  success: '#4ADE80',
-  successDark: '#22C55E',
-  warning: '#FBBF24',
-  warningDark: '#F59E0B',
-  error: '#F87171',
-  errorDark: '#EF4444',
+  // Status
+  success:           '#30D158',  // iOS green
+  successMuted:      'rgba(48,209,88,0.12)',
+  warning:           '#FF9F0A',  // iOS amber
+  warningMuted:      'rgba(255,159,10,0.12)',
+  error:             '#FF3B30',
 
   // Recording states
-  recording: '#FF4757',
-  recordingGlow: 'rgba(255, 71, 87, 0.3)',
-  paused: '#FBBF24',
-  pausedGlow: 'rgba(251, 191, 36, 0.3)',
+  recording:         '#FF3B30',
+  recordingGlow:     'rgba(255,59,48,0.30)',
+  paused:            '#FF9F0A',
+  pausedGlow:        'rgba(255,159,10,0.25)',
 
   // Utility
-  white: '#FFFFFF',
-  black: '#000000',
-  transparent: 'transparent',
+  white:             '#FFFFFF',
+  black:             '#000000',
+  transparent:       'transparent',
 
-  // Gradients (for reference in linear-gradient usage)
-  gradientStart: '#6C63FF',
-  gradientEnd: '#FF6B6B',
+  // Chip/badge accent (non-red interactive)
+  chip:              '#1E1E1E',
+  chipBorder:        '#2E2E2E',
+  chipActive:        'rgba(255,59,48,0.10)',
+  chipActiveBorder:  'rgba(255,59,48,0.40)',
 };

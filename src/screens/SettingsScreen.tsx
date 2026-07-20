@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   Switch,
   TouchableOpacity,
   ScrollView,
+  Modal,
+  Pressable,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -15,6 +17,163 @@ import {SettingsManager, AppSettings} from '../modules/SettingsManager';
 type ResolutionOption = '720p' | '1080p' | 'device';
 type FpsOption = 30 | 60;
 
+// ─── Sub-components ────────────────────────────────────────────────────────
+
+/** Midas-style flat row with divider */
+function Row({
+  icon,
+  label,
+  value,
+  onPress,
+  last,
+}: {
+  icon: string;
+  label: string;
+  value?: string;
+  onPress?: () => void;
+  last?: boolean;
+}) {
+  return (
+    <>
+      <TouchableOpacity
+        style={styles.row}
+        onPress={onPress}
+        disabled={!onPress}
+        activeOpacity={onPress ? 0.6 : 1}>
+        <View style={styles.rowIconWrap}>
+          <Icon name={icon} size={19} color={Colors.textSecondary} />
+        </View>
+        <Text style={styles.rowLabel}>{label}</Text>
+        <View style={styles.rowRight}>
+          {value ? (
+            <Text style={styles.rowValue}>{value}</Text>
+          ) : null}
+          {onPress ? (
+            <Icon name="chevron-right" size={18} color={Colors.textMuted} style={{marginLeft: 4}} />
+          ) : null}
+        </View>
+      </TouchableOpacity>
+      {!last && <View style={styles.divider} />}
+    </>
+  );
+}
+
+/** Toggle row */
+function ToggleRow({
+  icon,
+  label,
+  desc,
+  value,
+  onValueChange,
+  last,
+}: {
+  icon: string;
+  label: string;
+  desc?: string;
+  value: boolean;
+  onValueChange: (v: boolean) => void;
+  last?: boolean;
+}) {
+  return (
+    <>
+      <View style={styles.row}>
+        <View style={styles.rowIconWrap}>
+          <Icon name={icon} size={19} color={Colors.textSecondary} />
+        </View>
+        <View style={{flex: 1}}>
+          <Text style={styles.rowLabel}>{label}</Text>
+          {desc ? <Text style={styles.rowDesc}>{desc}</Text> : null}
+        </View>
+        <Switch
+          value={value}
+          onValueChange={onValueChange}
+          trackColor={{false: Colors.surfaceHighlight, true: Colors.primary}}
+          thumbColor={Colors.white}
+          style={{marginLeft: 8}}
+        />
+      </View>
+      {!last && <View style={styles.divider} />}
+    </>
+  );
+}
+
+/** Section header label */
+function SectionHead({title}: {title: string}) {
+  return <Text style={styles.sectionHead}>{title}</Text>;
+}
+
+/** Section card wrapper */
+function Section({children}: {children: React.ReactNode}) {
+  return <View style={styles.section}>{children}</View>;
+}
+
+// ─── Bottom Sheet Modal (Midas-style) ─────────────────────────────────────
+function PickerModal<T extends string | number>({
+  visible,
+  title,
+  options,
+  selected,
+  onSelect,
+  onClose,
+}: {
+  visible: boolean;
+  title: string;
+  options: {label: string; desc: string; value: T}[];
+  selected: T;
+  onSelect: (v: T) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}>
+      <Pressable style={styles.modalBackdrop} onPress={onClose} />
+      <View style={styles.modalSheet}>
+        {/* Handle */}
+        <View style={styles.modalHandle} />
+        <Text style={styles.modalTitle}>{title}</Text>
+
+        {options.map((opt, i) => {
+          const isSelected = opt.value === selected;
+          return (
+            <React.Fragment key={String(opt.value)}>
+              <TouchableOpacity
+                style={styles.modalOption}
+                onPress={() => {
+                  onSelect(opt.value);
+                  onClose();
+                }}
+                activeOpacity={0.65}>
+                <View style={{flex: 1}}>
+                  <Text
+                    style={[
+                      styles.modalOptionLabel,
+                      isSelected && {color: Colors.primary},
+                    ]}>
+                    {opt.label}
+                  </Text>
+                  <Text style={styles.modalOptionDesc}>{opt.desc}</Text>
+                </View>
+                {isSelected && (
+                  <Icon name="check-circle" size={20} color={Colors.primary} />
+                )}
+              </TouchableOpacity>
+              {i < options.length - 1 && <View style={styles.divider} />}
+            </React.Fragment>
+          );
+        })}
+
+        <TouchableOpacity style={styles.modalCancel} onPress={onClose} activeOpacity={0.7}>
+          <Text style={styles.modalCancelText}>Vazgeç</Text>
+        </TouchableOpacity>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Main Screen ──────────────────────────────────────────────────────────
 export default function SettingsScreen() {
   const [settings, setSettings] = useState<AppSettings>({
     resolution: '1080p',
@@ -23,351 +182,290 @@ export default function SettingsScreen() {
     showTouches: false,
     saveFolder: 'Movies/VelaudRecorder',
   });
+  const [showResModal, setShowResModal] = useState(false);
+  const [showFpsModal, setShowFpsModal] = useState(false);
 
   useEffect(() => {
     SettingsManager.load().then(setSettings);
   }, []);
 
-  const update = async (patch: Partial<AppSettings>) => {
+  const update = useCallback(async (patch: Partial<AppSettings>) => {
     const updated = {...settings, ...patch};
     setSettings(updated);
     await SettingsManager.save(patch);
-  };
+  }, [settings]);
 
-  const resolutions: {label: string; desc: string; value: ResolutionOption; icon: string}[] = [
-    {label: '720p', desc: 'HD - Küçük dosya boyutu', value: '720p', icon: 'quality-low'},
-    {label: '1080p', desc: 'Full HD - Önerilen', value: '1080p', icon: 'quality-high'},
-    {label: 'Cihaz', desc: 'Cihaz çözünürlüğü', value: 'device', icon: 'cellphone'},
+  const resolutions: {label: string; desc: string; value: ResolutionOption}[] = [
+    {label: '720p — HD', desc: 'Küçük dosya boyutu, standart kalite', value: '720p'},
+    {label: '1080p — Full HD', desc: 'Önerilen. Netlik ve boyut dengesi', value: '1080p'},
+    {label: 'Cihaz çözünürlüğü', desc: 'Ekranın tam çözünürlüğünde kaydet', value: 'device'},
   ];
 
   const fpsOptions: {label: string; desc: string; value: FpsOption}[] = [
-    {label: '30 FPS', desc: 'Standart - Küçük dosya', value: 30},
-    {label: '60 FPS', desc: 'Ultra akıcı - Büyük dosya', value: 60},
+    {label: '30 FPS', desc: 'Standart — küçük dosya boyutu', value: 30},
+    {label: '60 FPS', desc: 'Ultra akıcı — büyük dosya boyutu', value: 60},
   ];
 
+  const resLabel = settings.resolution === 'device' ? 'Cihaz' : settings.resolution;
+
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Resolution */}
-        <Text style={styles.sectionHeader}>VIDEO KALİTESİ</Text>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Çözünürlük</Text>
-          <View style={styles.optionsGrid}>
-            {resolutions.map(opt => (
-              <TouchableOpacity
-                key={opt.value}
-                style={[
-                  styles.optionCard,
-                  settings.resolution === opt.value && styles.optionCardSelected,
-                ]}
-                onPress={() => update({resolution: opt.value})}>
-                <View style={styles.optionRow}>
-                  <Icon
-                    name={opt.icon}
-                    size={20}
-                    color={settings.resolution === opt.value ? Colors.primary : Colors.textSecondary}
-                    style={styles.optionIcon}
-                  />
-                  <View style={styles.optionTextContainer}>
-                    <Text style={[
-                      styles.optionLabel,
-                      settings.resolution === opt.value && styles.optionLabelSelected,
-                    ]}>
-                      {opt.label}
-                    </Text>
-                    <Text style={styles.optionDesc}>{opt.desc}</Text>
-                  </View>
-                </View>
-                {settings.resolution === opt.value && (
-                  <View style={styles.checkMark}>
-                    <Icon name="check" size={14} color={Colors.white} />
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}>
+
+        {/* Page title (Midas-style inline header) */}
+        <Text style={styles.pageTitle}>Ayarlar</Text>
+
+        {/* ── Video kalitesi ─────────────────────────────────────────── */}
+        <SectionHead title="VİDEO KALİTESİ" />
+        <Section>
+          <Row
+            icon="quality-high"
+            label="Çözünürlük"
+            value={resLabel}
+            onPress={() => setShowResModal(true)}
+          />
+          <Row
+            icon="filmstrip"
+            label="Kare Hızı"
+            value={`${settings.fps} FPS`}
+            onPress={() => setShowFpsModal(true)}
+            last
+          />
+        </Section>
+
+        {/* ── Ses ve kontrol ────────────────────────────────────────── */}
+        <SectionHead title="SES VE KONTROL" />
+        <Section>
+          <ToggleRow
+            icon="microphone"
+            label="Ses Kaydı"
+            desc="Mikrofon sesini kayda dahil et"
+            value={settings.includeAudio}
+            onValueChange={v => update({includeAudio: v})}
+          />
+          <ToggleRow
+            icon="gesture-tap"
+            label="Dokunma Göstergesi"
+            desc="Ekrana dokunulan noktaları göster"
+            value={settings.showTouches}
+            onValueChange={v => update({showTouches: v})}
+            last
+          />
+        </Section>
+
+        {/* ── Depolama ──────────────────────────────────────────────── */}
+        <SectionHead title="DEPOLAMA" />
+        <Section>
+          <Row
+            icon="folder-outline"
+            label="Kayıt Konumu"
+            value={`/${settings.saveFolder}`}
+            last
+          />
+        </Section>
+
+        {/* ── Hakkında ──────────────────────────────────────────────── */}
+        <SectionHead title="HAKKINDA" />
+        <Section>
+          <Row
+            icon="information-outline"
+            label="Velaud Recorder"
+            value="v2.1.0"
+            last
+          />
+        </Section>
+
+        {/* App signature */}
+        <View style={styles.signature}>
+          <View style={styles.sigLogo}>
+            <Icon name="record-circle" size={16} color={Colors.white} />
           </View>
-        </View>
-
-        {/* FPS */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Kare Hızı</Text>
-          <View style={styles.optionsRow}>
-            {fpsOptions.map(opt => (
-              <TouchableOpacity
-                key={opt.value}
-                style={[
-                  styles.fpsCard,
-                  settings.fps === opt.value && styles.fpsCardSelected,
-                ]}
-                onPress={() => update({fps: opt.value})}>
-                <Text style={[
-                  styles.fpsLabel,
-                  settings.fps === opt.value && styles.fpsLabelSelected,
-                ]}>
-                  {opt.label}
-                </Text>
-                <Text style={styles.fpsDesc}>{opt.desc}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Audio & Touch */}
-        <Text style={styles.sectionHeader}>KAYIT SEÇENEKLERİ</Text>
-        <View style={styles.section}>
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleLeft}>
-              <View style={styles.toggleIconContainer}>
-                <Icon name="microphone" size={22} color={Colors.primary} />
-              </View>
-              <View style={styles.toggleInfo}>
-                <Text style={styles.toggleLabel}>Ses Kaydı</Text>
-                <Text style={styles.toggleDesc}>Mikrofon sesini dahil et</Text>
-              </View>
-            </View>
-            <Switch
-              value={settings.includeAudio}
-              onValueChange={v => update({includeAudio: v})}
-              trackColor={{false: Colors.border, true: Colors.primary}}
-              thumbColor={Colors.white}
-            />
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleLeft}>
-              <View style={styles.toggleIconContainer}>
-                <Icon name="gesture-tap" size={22} color={Colors.primary} />
-              </View>
-              <View style={styles.toggleInfo}>
-                <Text style={styles.toggleLabel}>Dokunma Göstergesi</Text>
-                <Text style={styles.toggleDesc}>Ekrana dokunulduğunda göster</Text>
-              </View>
-            </View>
-            <Switch
-              value={settings.showTouches}
-              onValueChange={v => update({showTouches: v})}
-              trackColor={{false: Colors.border, true: Colors.primary}}
-              thumbColor={Colors.white}
-            />
-          </View>
-        </View>
-
-        {/* Storage Info */}
-        <Text style={styles.sectionHeader}>DEPOLAMA</Text>
-        <View style={styles.section}>
-          <View style={styles.infoRow}>
-            <View style={styles.toggleIconContainer}>
-              <Icon name="folder-outline" size={22} color={Colors.primary} />
-            </View>
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Kayıt Konumu</Text>
-              <Text style={styles.infoValue}>/{settings.saveFolder}</Text>
-              <Text style={styles.infoDesc}>
-                Tüm kayıtlar cihazınızda yerel olarak saklanır
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* About */}
-        <View style={styles.aboutSection}>
-          <Icon name="record-circle" size={28} color={Colors.primary} />
-          <Text style={styles.aboutTitle}>Velaud Recorder</Text>
-          <Text style={styles.aboutVersion}>v2.0.0 (build 11)</Text>
-          <Text style={styles.aboutDesc}>
-            Profesyonel ekran kaydedici
-          </Text>
+          <Text style={styles.sigText}>Velaud Recorder</Text>
+          <Text style={styles.sigSub}>Profesyonel ekran kaydedici</Text>
         </View>
       </ScrollView>
+
+      {/* Çözünürlük seçici */}
+      <PickerModal
+        visible={showResModal}
+        title="Çözünürlük Seç"
+        options={resolutions}
+        selected={settings.resolution}
+        onSelect={v => update({resolution: v})}
+        onClose={() => setShowResModal(false)}
+      />
+
+      {/* FPS seçici */}
+      <PickerModal
+        visible={showFpsModal}
+        title="Kare Hızı Seç"
+        options={fpsOptions}
+        selected={settings.fps}
+        onSelect={v => update({fps: v})}
+        onClose={() => setShowFpsModal(false)}
+      />
     </SafeAreaView>
   );
 }
 
+// ─── Styles ────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: Colors.background},
-  content: {padding: 20, paddingBottom: 40},
-  sectionHeader: {
+  root: {flex: 1, backgroundColor: Colors.background},
+  content: {paddingHorizontal: 20, paddingBottom: 40},
+
+  pageTitle: {
+    color: Colors.white,
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    marginTop: 8,
+    marginBottom: 24,
+  },
+
+  sectionHead: {
     color: Colors.textMuted,
     fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 2,
-    marginBottom: 10,
-    marginTop: 8,
-    paddingLeft: 4,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    marginBottom: 8,
+    marginTop: 4,
+    paddingLeft: 2,
   },
+
   section: {
     backgroundColor: Colors.surface,
     borderRadius: 16,
     marginBottom: 20,
-    padding: 16,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  sectionTitle: {
-    color: Colors.text,
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 14,
-  },
-  optionsGrid: {
-    gap: 10,
-  },
-  optionCard: {
+
+  // Midas-style flat rows
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+    minHeight: 54,
   },
-  optionCardSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: 'rgba(108, 99, 255, 0.08)',
-  },
-  optionRow: {
-    flexDirection: 'row',
+  rowIconWrap: {
+    width: 32,
     alignItems: 'center',
-    flex: 1,
-  },
-  optionIcon: {
     marginRight: 12,
   },
-  optionTextContainer: {
+  rowLabel: {
     flex: 1,
-  },
-  optionLabel: {
-    color: Colors.textSecondary,
+    color: Colors.white,
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '500',
   },
-  optionLabelSelected: {
-    color: Colors.primary,
-  },
-  optionDesc: {
+  rowDesc: {
     color: Colors.textMuted,
     fontSize: 12,
     marginTop: 2,
   },
-  checkMark: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  optionsRow: {
+  rowRight: {
     flexDirection: 'row',
-    gap: 10,
-  },
-  fpsCard: {
-    flex: 1,
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
     alignItems: 'center',
   },
-  fpsCardSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: 'rgba(108, 99, 255, 0.08)',
-  },
-  fpsLabel: {
-    color: Colors.textSecondary,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  fpsLabelSelected: {
-    color: Colors.primary,
-  },
-  fpsDesc: {
+  rowValue: {
     color: Colors.textMuted,
-    fontSize: 11,
-    marginTop: 4,
-    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '500',
   },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  toggleLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 12,
-  },
-  toggleIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: 'rgba(108, 99, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  toggleInfo: {flex: 1},
-  toggleLabel: {
-    color: Colors.text,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  toggleDesc: {
-    color: Colors.textMuted,
-    fontSize: 12,
-    marginTop: 2,
-  },
+
   divider: {
     height: 1,
     backgroundColor: Colors.border,
-    marginVertical: 14,
+    marginLeft: 16 + 32 + 12, // align with text, skip icon
   },
-  infoRow: {
+
+  // Bottom sheet modal
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.60)',
+  },
+  modalSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    borderBottomWidth: 0,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.borderLight,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  modalTitle: {
+    color: Colors.white,
+    fontSize: 17,
+    fontWeight: '800',
+    marginBottom: 16,
+    letterSpacing: -0.2,
+  },
+  modalOption: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+    alignItems: 'center',
+    paddingVertical: 16,
   },
-  infoContent: {flex: 1},
-  infoLabel: {
-    color: Colors.textSecondary,
-    fontSize: 13,
+  modalOptionLabel: {
+    color: Colors.white,
+    fontSize: 15,
     fontWeight: '600',
   },
-  infoValue: {
-    color: Colors.text,
+  modalOptionDesc: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    marginTop: 3,
+  },
+  modalCancel: {
+    marginTop: 16,
+    paddingVertical: 16,
+    borderRadius: 14,
+    backgroundColor: Colors.surfaceElevated,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  modalCancelText: {
+    color: Colors.textSecondary,
     fontSize: 15,
     fontWeight: '700',
-    marginTop: 2,
   },
-  infoDesc: {
-    color: Colors.textMuted,
-    fontSize: 12,
-    marginTop: 4,
-  },
-  aboutSection: {
+
+  // Signature
+  signature: {
     alignItems: 'center',
-    paddingVertical: 24,
-    gap: 4,
+    paddingVertical: 32,
+    gap: 6,
   },
-  aboutTitle: {
-    color: Colors.text,
-    fontSize: 18,
-    fontWeight: '800',
-    marginTop: 8,
+  sigLogo: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
   },
-  aboutVersion: {
-    color: Colors.primary,
-    fontSize: 13,
-    fontWeight: '600',
+  sigText: {
+    color: Colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '700',
   },
-  aboutDesc: {
+  sigSub: {
     color: Colors.textMuted,
     fontSize: 12,
-    marginTop: 2,
   },
 });

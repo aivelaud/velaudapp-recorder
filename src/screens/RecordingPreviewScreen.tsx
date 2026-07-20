@@ -9,7 +9,6 @@ import {
   ToastAndroid,
   ActivityIndicator,
   Dimensions,
-  Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation, useRoute, RouteProp} from '@react-navigation/native';
@@ -23,53 +22,87 @@ import {RootStackParamList} from '../navigation/AppNavigator';
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 type RouteType = RouteProp<RootStackParamList, 'RecordingPreview'>;
 
-const {width: SCREEN_WIDTH} = Dimensions.get('window');
-const VIDEO_HEIGHT = SCREEN_WIDTH * (9 / 16);
+const {width: W} = Dimensions.get('window');
+const VIDEO_H = W * (9 / 16);
 
+// ─── Action pill ──────────────────────────────────────────────────────────
+function ActionPill({
+  icon,
+  label,
+  onPress,
+  danger,
+  primary,
+}: {
+  icon: string;
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+  primary?: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      style={[
+        styles.pill,
+        danger && styles.pillDanger,
+        primary && styles.pillPrimary,
+      ]}
+      onPress={onPress}
+      activeOpacity={0.7}>
+      <Icon
+        name={icon}
+        size={19}
+        color={
+          primary ? Colors.white : danger ? Colors.primary : Colors.textSecondary
+        }
+      />
+      <Text
+        style={[
+          styles.pillLabel,
+          danger && styles.pillLabelDanger,
+          primary && styles.pillLabelPrimary,
+        ]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Screen ────────────────────────────────────────────────────────────────
 export default function RecordingPreviewScreen() {
   const navigation = useNavigation<NavProp>();
   const route = useRoute<RouteType>();
   const {filePath} = route.params;
 
   const [paused, setPaused] = useState(true);
-  const [videoLoading, setVideoLoading] = useState(true);
-  const [videoError, setVideoError] = useState(false);
-  const [deleted, setDeleted] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
-  // Derive a playable URI from the filePath (content:// or file://)
-  const videoUri = filePath.startsWith('content://')
-    ? filePath
-    : `file://${filePath}`;
+  const uri = filePath.startsWith('content://') ? filePath : `file://${filePath}`;
 
-  const handlePlay = () => setPaused(p => !p);
+  const goBack = useCallback(() => navigation.navigate('Main'), [navigation]);
 
   const handleShare = useCallback(async () => {
     try {
-      await Share.share({
-        url: videoUri,
-        title: 'Velaud Recorder — Ekran Kaydı',
-        message: 'Ekran kaydım',
-      });
+      await Share.share({url: uri, title: 'Ekran kaydım'});
     } catch (e: any) {
-      Alert.alert('Paylaşım Hatası', e?.message ?? 'Paylaşım başarısız.');
+      Alert.alert('Paylaşım Hatası', e?.message ?? '');
     }
-  }, [videoUri]);
+  }, [uri]);
 
   const handleDelete = useCallback(() => {
     Alert.alert(
       'Videoyu Sil',
       'Bu kayıt kalıcı olarak silinecek. Emin misiniz?',
       [
-        {text: 'İptal', style: 'cancel'},
+        {text: 'Vazgeç', style: 'cancel'},
         {
           text: 'Sil',
           style: 'destructive',
           onPress: async () => {
             const ok = await VideoLibrary.deleteVideo(filePath);
             if (ok) {
-              setDeleted(true);
-              ToastAndroid.show('Kayıt silindi', ToastAndroid.SHORT);
-              navigation.navigate('Main');
+              ToastAndroid.show('Video silindi', ToastAndroid.SHORT);
+              goBack();
             } else {
               Alert.alert('Hata', 'Video silinemedi.');
             }
@@ -77,95 +110,68 @@ export default function RecordingPreviewScreen() {
         },
       ],
     );
-  }, [filePath, navigation]);
+  }, [filePath, goBack]);
 
   const handleTrim = useCallback(() => {
-    // Open the video in Android's built-in trim/edit activity
-    try {
-      const {Linking} = require('react-native');
-      const intent = `android.intent.action.EDIT`;
-      Linking.openURL(videoUri).catch(() => {
-        ToastAndroid.show('Video düzenleyici bulunamadı', ToastAndroid.SHORT);
-      });
-    } catch {
-      ToastAndroid.show('Bu cihazda kırpma desteklenmiyor', ToastAndroid.SHORT);
-    }
-  }, [videoUri]);
-
-  const handleEdit = useCallback(() => {
-    // Navigate to videos list for editing options
-    navigation.navigate('Main');
-    ToastAndroid.show('Video galeriye kaydedildi', ToastAndroid.SHORT);
-  }, [navigation]);
-
-  if (deleted) {
-    return null;
-  }
+    ToastAndroid.show('Video galeri uygulamasında düzenleyin', ToastAndroid.LONG);
+  }, []);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* Header */}
+    <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
+      {/* ── Header ──────────────────────────────────────────────────────── */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.navigate('Main')}
-          hitSlop={{top: 12, bottom: 12, left: 12, right: 12}}>
-          <Icon name="arrow-left" size={22} color={Colors.text} />
+        <TouchableOpacity style={styles.backBtn} onPress={goBack}>
+          <Icon name="arrow-left" size={20} color={Colors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Kayıt Tamamlandı</Text>
+        <Text style={styles.headerTitle}>Kayıt Önizleme</Text>
         <View style={{width: 40}} />
       </View>
 
-      {/* Success banner */}
-      <View style={styles.successBanner}>
-        <Icon name="check-circle" size={20} color="#4ade80" />
-        <Text style={styles.successText}>Video galeriye kaydedildi!</Text>
+      {/* Success strip */}
+      <View style={styles.successStrip}>
+        <Icon name="check-circle-outline" size={16} color={Colors.success} />
+        <Text style={styles.successText}>Kayıt başarıyla tamamlandı</Text>
       </View>
 
-      {/* Video Player */}
-      <View style={styles.playerContainer}>
-        {videoError ? (
-          <View style={styles.videoError}>
-            <Icon name="video-off-outline" size={48} color={Colors.textMuted} />
-            <Text style={styles.videoErrorText}>Önizleme yüklenemedi</Text>
-            <Text style={styles.videoErrorSubtext}>
-              Video galeri uygulamasından izleyebilirsiniz
+      {/* ── Video player ─────────────────────────────────────────────────── */}
+      <View style={styles.playerWrap}>
+        {hasError ? (
+          <View style={styles.playerError}>
+            <Icon name="video-off-outline" size={40} color={Colors.textMuted} />
+            <Text style={styles.playerErrorText}>Önizleme yüklenemedi</Text>
+            <Text style={styles.playerErrorSub}>
+              Videoyu galeri uygulamasından izleyebilirsiniz
             </Text>
           </View>
         ) : (
           <>
             <Video
-              source={{uri: videoUri}}
+              source={{uri}}
               style={styles.video}
               paused={paused}
               resizeMode="contain"
               controls={false}
               repeat={false}
-              onLoadStart={() => setVideoLoading(true)}
-              onLoad={() => setVideoLoading(false)}
+              onLoadStart={() => setLoading(true)}
+              onLoad={() => setLoading(false)}
               onError={() => {
-                setVideoLoading(false);
-                setVideoError(true);
+                setLoading(false);
+                setHasError(true);
               }}
               onEnd={() => setPaused(true)}
             />
-            {videoLoading && (
-              <View style={styles.loadingOverlay}>
+            {loading && (
+              <View style={styles.playerLoading}>
                 <ActivityIndicator size="large" color={Colors.primary} />
               </View>
             )}
-            {/* Play/pause overlay button */}
             <TouchableOpacity
               style={styles.playOverlay}
-              onPress={handlePlay}
-              activeOpacity={0.7}>
-              {!videoLoading && (
+              onPress={() => setPaused(p => !p)}
+              activeOpacity={0.8}>
+              {!loading && (
                 <View style={styles.playBtn}>
-                  <Icon
-                    name={paused ? 'play' : 'pause'}
-                    size={32}
-                    color={Colors.white}
-                  />
+                  <Icon name={paused ? 'play' : 'pause'} size={30} color={Colors.white} />
                 </View>
               )}
             </TouchableOpacity>
@@ -173,121 +179,93 @@ export default function RecordingPreviewScreen() {
         )}
       </View>
 
-      {/* Action Buttons */}
-      <View style={styles.actionsContainer}>
-        <Text style={styles.actionsTitle}>Ne yapmak istersiniz?</Text>
+      {/* ── Actions ──────────────────────────────────────────────────────── */}
+      <View style={styles.actionsWrap}>
+        <Text style={styles.actionsLabel}>İşlemler</Text>
 
-        <View style={styles.actionsGrid}>
-          {/* Delete */}
-          <TouchableOpacity
-            style={[styles.actionCard, styles.actionCardDanger]}
+        {/* Primary action: Share */}
+        <ActionPill
+          icon="share-variant"
+          label="Paylaş"
+          onPress={handleShare}
+          primary
+        />
+
+        {/* Secondary row */}
+        <View style={styles.actionsRow}>
+          <ActionPill icon="content-cut" label="Kırp" onPress={handleTrim} />
+          <ActionPill
+            icon="delete-outline"
+            label="Sil"
             onPress={handleDelete}
-            activeOpacity={0.8}>
-            <View style={[styles.actionIcon, styles.actionIconDanger]}>
-              <Icon name="delete-outline" size={24} color="#f87171" />
-            </View>
-            <Text style={[styles.actionLabel, styles.actionLabelDanger]}>
-              Sil
-            </Text>
-          </TouchableOpacity>
-
-          {/* Trim */}
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={handleTrim}
-            activeOpacity={0.8}>
-            <View style={styles.actionIcon}>
-              <Icon name="content-cut" size={24} color={Colors.primary} />
-            </View>
-            <Text style={styles.actionLabel}>Kırp</Text>
-          </TouchableOpacity>
-
-          {/* Edit/Done */}
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={handleEdit}
-            activeOpacity={0.8}>
-            <View style={styles.actionIcon}>
-              <Icon name="check-all" size={24} color="#4ade80" />
-            </View>
-            <Text style={styles.actionLabel}>Tamam</Text>
-          </TouchableOpacity>
-
-          {/* Share */}
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={handleShare}
-            activeOpacity={0.8}>
-            <View style={styles.actionIcon}>
-              <Icon name="share-variant" size={24} color={Colors.primary} />
-            </View>
-            <Text style={styles.actionLabel}>Paylaş</Text>
-          </TouchableOpacity>
+            danger
+          />
+          <ActionPill icon="check" label="Tamam" onPress={goBack} />
         </View>
       </View>
     </SafeAreaView>
   );
 }
 
+// ─── Styles ────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
+  root: {flex: 1, backgroundColor: Colors.background},
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
   },
   backBtn: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: Colors.surfaceElevated,
+    backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   headerTitle: {
-    color: Colors.text,
-    fontSize: 18,
+    color: Colors.white,
+    fontSize: 17,
     fontWeight: '800',
   },
-  successBanner: {
+
+  successStrip: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 10,
+    gap: 7,
     marginHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: 'rgba(74, 222, 128, 0.1)',
+    backgroundColor: Colors.successMuted,
     borderWidth: 1,
-    borderColor: 'rgba(74, 222, 128, 0.3)',
-    marginBottom: 12,
+    borderColor: 'rgba(48,209,88,0.25)',
+    marginBottom: 10,
   },
   successText: {
-    color: '#4ade80',
-    fontSize: 14,
+    color: Colors.success,
+    fontSize: 13,
     fontWeight: '700',
   },
-  playerContainer: {
-    width: SCREEN_WIDTH,
-    height: VIDEO_HEIGHT,
+
+  // Player
+  playerWrap: {
+    width: W,
+    height: VIDEO_H,
     backgroundColor: '#000',
     position: 'relative',
-    overflow: 'hidden',
   },
-  video: {
-    width: '100%',
-    height: '100%',
-  },
-  loadingOverlay: {
+  video: {width: '100%', height: '100%'},
+  playerLoading: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
   },
   playOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -295,84 +273,83 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   playBtn: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.5)',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(0,0,0,0.60)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  videoError: {
+  playerError: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
     backgroundColor: Colors.surfaceElevated,
+    gap: 10,
   },
-  videoErrorText: {
+  playerErrorText: {
     color: Colors.textSecondary,
     fontSize: 15,
     fontWeight: '700',
   },
-  videoErrorSubtext: {
+  playerErrorSub: {
     color: Colors.textMuted,
-    fontSize: 13,
+    fontSize: 12,
     textAlign: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: 32,
   },
-  actionsContainer: {
+
+  // Actions
+  actionsWrap: {
     flex: 1,
     paddingHorizontal: 16,
     paddingTop: 20,
+    gap: 10,
   },
-  actionsTitle: {
-    color: Colors.textSecondary,
-    fontSize: 13,
+  actionsLabel: {
+    color: Colors.textMuted,
+    fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: 14,
+    letterSpacing: 1.5,
+    marginBottom: 2,
   },
-  actionsGrid: {
+  actionsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+    gap: 10,
   },
-  actionCard: {
-    width: (SCREEN_WIDTH - 32 - 36) / 4,
-    aspectRatio: 1,
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: 16,
+
+  // Pills (Midas-style)
+  pill: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  actionCardDanger: {
-    borderColor: 'rgba(248,113,113,0.3)',
-    backgroundColor: 'rgba(248,113,113,0.06)',
+  pillDanger: {
+    backgroundColor: Colors.primaryMuted,
+    borderColor: Colors.chipActiveBorder,
   },
-  actionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: `${Colors.primary}15`,
-    alignItems: 'center',
-    justifyContent: 'center',
+  pillPrimary: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.transparent,
   },
-  actionIconDanger: {
-    backgroundColor: 'rgba(248,113,113,0.12)',
-  },
-  actionLabel: {
-    color: Colors.text,
-    fontSize: 12,
+  pillLabel: {
+    color: Colors.textSecondary,
+    fontSize: 14,
     fontWeight: '700',
-    textAlign: 'center',
   },
-  actionLabelDanger: {
-    color: '#f87171',
+  pillLabelDanger: {
+    color: Colors.primary,
+  },
+  pillLabelPrimary: {
+    color: Colors.white,
   },
 });

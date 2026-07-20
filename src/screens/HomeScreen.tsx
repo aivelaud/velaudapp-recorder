@@ -10,28 +10,123 @@ import {
   PermissionsAndroid,
   ToastAndroid,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import {RootStackParamList} from '../navigation/AppNavigator';
 import {Colors} from '../theme/colors';
-import {Recorder, FloatingPanel, RecordingStatus, RecordingConfig} from '../modules/RecorderModule';
+import {
+  Recorder,
+  FloatingPanel,
+  RecordingStatus,
+  RecordingConfig,
+} from '../modules/RecorderModule';
 import {SettingsManager, AppSettings} from '../modules/SettingsManager';
+import {RootStackParamList} from '../navigation/AppNavigator';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
-const {width: SCREEN_WIDTH} = Dimensions.get('window');
+const {width: W} = Dimensions.get('window');
 
-const formatDuration = (ms: number): string => {
-  const totalSec = Math.floor(ms / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+// ─── Helpers ───────────────────────────────────────────────────────────────
+const pad = (n: number) => String(n).padStart(2, '0');
+const fmtDuration = (ms: number) => {
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return `${pad(h)}:${pad(m)}:${pad(s % 60)}`;
 };
 
+// ─── Radar Ring — single animated ring ────────────────────────────────────
+function RadarRing({
+  delay,
+  active,
+  color,
+}: {
+  delay: number;
+  active: boolean;
+  color: string;
+}) {
+  const scale = useRef(new Animated.Value(0.4)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let loop: Animated.CompositeAnimation | null = null;
+    if (active) {
+      loop = Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.parallel([
+            Animated.timing(scale, {
+              toValue: 1,
+              duration: 1600,
+              useNativeDriver: true,
+            }),
+            Animated.sequence([
+              Animated.timing(opacity, {
+                toValue: 0.5,
+                duration: 200,
+                useNativeDriver: true,
+              }),
+              Animated.timing(opacity, {
+                toValue: 0,
+                duration: 1400,
+                useNativeDriver: true,
+              }),
+            ]),
+          ]),
+        ]),
+      );
+      loop.start();
+    } else {
+      scale.setValue(0.4);
+      opacity.setValue(0);
+    }
+    return () => loop?.stop();
+  }, [active, delay, scale, opacity]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.radarRing,
+        {
+          borderColor: color,
+          transform: [{scale}],
+          opacity,
+        },
+      ]}
+    />
+  );
+}
+
+// ─── Feature Chip ──────────────────────────────────────────────────────────
+function Chip({
+  icon,
+  label,
+  active,
+}: {
+  icon: string;
+  label: string;
+  active?: boolean;
+}) {
+  return (
+    <View
+      style={[styles.chip, active && styles.chipActive]}>
+      <Icon
+        name={icon}
+        size={14}
+        color={active ? Colors.primary : Colors.textMuted}
+      />
+      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+// ─── Screen ────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const navigation = useNavigation<NavProp>();
   const [status, setStatus] = useState<RecordingStatus>({
@@ -46,39 +141,31 @@ export default function HomeScreen() {
     showTouches: false,
     saveFolder: 'Movies/VelaudRecorder',
   });
-  const [permissionChecked, setPermissionChecked] = useState(false);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
-  const pulseLoop = useRef<Animated.CompositeAnimation | null>(null);
-  const glowLoop = useRef<Animated.CompositeAnimation | null>(null);
 
+  // Button press scale animation
+  const btnScale = useRef(new Animated.Value(1)).current;
+  const breathe = useRef(new Animated.Value(1)).current;
+  const breatheLoop = useRef<Animated.CompositeAnimation | null>(null);
+
+  // ── Load settings ──────────────────────────────────────────────────────
   useEffect(() => {
     SettingsManager.load().then(setSettings);
+  }, []);
 
+  // ── Event subscriptions ────────────────────────────────────────────────
+  useEffect(() => {
     const statusSub = Recorder.onRecordingStatus(s => setStatus(s));
 
-    // FIX (SORUN 6): Navigate to preview screen when recording is saved
     const savedSub = Recorder.onRecordingSaved((filePath: string) => {
-      if (filePath && filePath.length > 0) {
-        ToastAndroid.show('Video kaydedildi!', ToastAndroid.SHORT);
+      if (filePath) {
         navigation.navigate('RecordingPreview', {filePath});
       } else {
-        ToastAndroid.show('Video başarıyla kaydedildi!', ToastAndroid.SHORT);
+        ToastAndroid.show('Kayıt tamamlandı', ToastAndroid.SHORT);
       }
     });
 
     const errorSub = Recorder.onRecordingError((err: string) => {
-      Alert.alert('Kayıt Hatası', err);
-    });
-
-    FloatingPanel.checkOverlayPermission().then(granted => {
-      setPermissionChecked(true);
-      if (!granted) {
-        ToastAndroid.show(
-          'Ekran üstü izni gerekli - Ayarlardan verin',
-          ToastAndroid.LONG,
-        );
-      }
+      Alert.alert('Kayıt Hatası', err, [{text: 'Tamam'}]);
     });
 
     return () => {
@@ -88,77 +175,83 @@ export default function HomeScreen() {
     };
   }, [navigation]);
 
+  // ── Breathing animation for idle button ───────────────────────────────
   useEffect(() => {
-    if (status.isRecording && !status.isPaused) {
-      pulseLoop.current = Animated.loop(
+    if (!status.isRecording) {
+      breatheLoop.current = Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseAnim, {toValue: 1.08, duration: 800, useNativeDriver: true}),
-          Animated.timing(pulseAnim, {toValue: 1, duration: 800, useNativeDriver: true}),
+          Animated.timing(breathe, {
+            toValue: 1.04,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(breathe, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
         ]),
       );
-      pulseLoop.current.start();
-
-      glowLoop.current = Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, {toValue: 1, duration: 1000, useNativeDriver: true}),
-          Animated.timing(glowAnim, {toValue: 0.4, duration: 1000, useNativeDriver: true}),
-        ]),
-      );
-      glowLoop.current.start();
+      breatheLoop.current.start();
     } else {
-      pulseLoop.current?.stop();
-      glowLoop.current?.stop();
-      pulseAnim.setValue(1);
-      glowAnim.setValue(0);
+      breatheLoop.current?.stop();
+      breathe.setValue(1);
     }
-    return () => {
-      pulseLoop.current?.stop();
-      glowLoop.current?.stop();
-    };
-  }, [status.isRecording, status.isPaused]);
+    return () => breatheLoop.current?.stop();
+  }, [status.isRecording, breathe]);
 
-  const requestAudioPermission = async (): Promise<boolean> => {
-    if (!settings.includeAudio) return true;
-    const granted = await PermissionsAndroid.request(
-      PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-      {
-        title: 'Mikrofon İzni',
-        message: 'Ses kaydı için mikrofon erişimi gereklidir.',
-        buttonPositive: 'İzin Ver',
-        buttonNegative: 'Reddet',
-      },
-    );
-    return granted === PermissionsAndroid.RESULTS.GRANTED;
-  };
+  // ── Press animation ────────────────────────────────────────────────────
+  const onPressIn = () =>
+    Animated.spring(btnScale, {
+      toValue: 0.96,
+      useNativeDriver: true,
+    }).start();
 
-  const handleStartRecording = useCallback(async () => {
+  const onPressOut = () =>
+    Animated.spring(btnScale, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
+
+  // ── Recording actions ──────────────────────────────────────────────────
+  const handleMain = useCallback(async () => {
+    if (status.isRecording) {
+      await handleStop();
+    } else {
+      await handleStart();
+    }
+  }, [status.isRecording]);
+
+  const handleStart = async () => {
     try {
       const overlayOk = await FloatingPanel.checkOverlayPermission();
       if (!overlayOk) {
         Alert.alert(
-          'Ekran Üstü İzni Gerekli',
-          'Kayıt sırasında kontrol panelini göstermek için "Diğer uygulamaların üzerinde göster" iznini vermeniz gerekiyor.\n\nBu izin olmadan kayıt başlatılamaz.',
+          'Ekran Üstü İzni',
+          'Kayıt sırasında kayan kontrol paneli için "Diğer uygulamaların üzerinde göster" iznini verin.',
           [
             {
               text: 'Ayarlara Git',
-              onPress: async () => {
-                await FloatingPanel.requestOverlayPermission();
-                ToastAndroid.show(
-                  'İzni verdikten sonra geri dönün',
-                  ToastAndroid.LONG,
-                );
-              },
+              onPress: () => FloatingPanel.requestOverlayPermission(),
             },
-            {text: 'İptal', style: 'cancel'},
+            {text: 'Vazgeç', style: 'cancel'},
           ],
         );
         return;
       }
 
       if (settings.includeAudio) {
-        const audioOk = await requestAudioPermission();
-        if (!audioOk) {
-          ToastAndroid.show('Ses kaydı devre dışı bırakıldı.', ToastAndroid.SHORT);
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+          {
+            title: 'Mikrofon İzni',
+            message: 'Ses kaydı için mikrofon gerekli.',
+            buttonPositive: 'Ver',
+            buttonNegative: 'Reddet',
+          },
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          ToastAndroid.show('Ses devre dışı bırakıldı', ToastAndroid.SHORT);
         }
       }
 
@@ -173,393 +266,404 @@ export default function HomeScreen() {
 
       const started = await Recorder.startRecording(config);
       if (!started) {
-        Alert.alert(
-          'Kayıt Başlatılamadı',
-          'Ekran kaydı izni reddedildi veya başka bir hata oluştu.',
-        );
+        Alert.alert('Başlatılamadı', 'Ekran kaydı izni reddedildi.');
         return;
       }
 
-      try {
-        await FloatingPanel.showPanel();
-      } catch (panelErr: any) {
-        console.warn('Floating panel error:', panelErr);
-        ToastAndroid.show(
-          'Kayıt başladı! Durdurmak için bildirim çubuğunu kullanın.',
-          ToastAndroid.LONG,
-        );
-      }
-      ToastAndroid.show('Kayıt başladı!', ToastAndroid.SHORT);
+      FloatingPanel.showPanel().catch(() => {});
     } catch (e: any) {
-      console.error('Recording start error:', e);
       Alert.alert('Hata', e?.message ?? 'Bilinmeyen bir hata oluştu.');
     }
-  }, [settings]);
+  };
 
-  const handleStopRecording = useCallback(async () => {
+  const handleStop = async () => {
     try {
       await Recorder.stopRecording();
       await FloatingPanel.hidePanel();
-      // Navigation to preview happens via RecordingSaved event listener
-    } catch (e: any) {
-      console.error('Stop recording error:', e);
-    }
-  }, []);
+    } catch {}
+  };
 
-  const handlePauseResume = useCallback(async () => {
+  const handlePause = useCallback(async () => {
     try {
       if (status.isPaused) {
         await Recorder.resumeRecording();
-        ToastAndroid.show('Kayıt devam ediyor', ToastAndroid.SHORT);
       } else {
         await Recorder.pauseRecording();
-        ToastAndroid.show('Kayıt duraklatıldı', ToastAndroid.SHORT);
       }
-    } catch (e: any) {
-      console.error('Pause/Resume error:', e);
-    }
+    } catch {}
   }, [status.isPaused]);
 
-  const resolutionLabel =
-    settings.resolution === 'device' ? 'Cihaz' : settings.resolution;
+  // ── Derived values ──────────────────────────────────────────────────────
+  const resLabel = settings.resolution === 'device' ? 'Cihaz' : settings.resolution;
+  const {isRecording, isPaused} = status;
+
+  const ringColor = isPaused ? Colors.paused : Colors.recording;
+  const btnBg = isRecording
+    ? isPaused
+      ? Colors.paused
+      : Colors.recording
+    : Colors.primary;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
+    <SafeAreaView style={styles.root} edges={['top']}>
+
+      {/* ── Header ─────────────────────────────────────────────────────── */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.logoContainer}>
-            <Icon name="record-circle" size={18} color={Colors.white} />
+        <View style={styles.headerBrand}>
+          <View style={styles.logoMark}>
+            <Icon name="record-circle" size={16} color={Colors.white} />
           </View>
-          <Text style={styles.headerTitle}>Velaud</Text>
+          <Text style={styles.brandName}>Velaud</Text>
         </View>
-        <TouchableOpacity
-          style={styles.settingsBtn}
-          onPress={() => navigation.navigate('Settings')}
-          hitSlop={{top: 12, bottom: 12, left: 12, right: 12}}>
-          <Icon name="cog" size={22} color={Colors.textSecondary} />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {isRecording && (
+            <View style={styles.recBadge}>
+              <View style={styles.recDot} />
+              <Text style={styles.recBadgeText}>CANLI</Text>
+            </View>
+          )}
+        </View>
       </View>
 
-      {/* Quick Settings Chips */}
-      <View style={styles.chipsRow}>
-        <TouchableOpacity
-          style={styles.chip}
-          onPress={() => navigation.navigate('Settings')}>
-          <Icon name="quality-high" size={16} color={Colors.textSecondary} style={styles.chipIcon} />
-          <Text style={styles.chipText}>{resolutionLabel}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.chip}
-          onPress={() => navigation.navigate('Settings')}>
-          <Icon name="filmstrip" size={16} color={Colors.textSecondary} style={styles.chipIcon} />
-          <Text style={styles.chipText}>{settings.fps} FPS</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.chip, settings.includeAudio ? styles.chipActive : styles.chipInactive]}
-          onPress={() => navigation.navigate('Settings')}>
-          <Icon
-            name={settings.includeAudio ? 'microphone' : 'microphone-off'}
-            size={16}
-            color={settings.includeAudio ? Colors.success : Colors.textMuted}
-            style={styles.chipIcon}
-          />
-          <Text style={styles.chipText}>
-            {settings.includeAudio ? 'Ses Açık' : 'Sessiz'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* ── Feature chips ───────────────────────────────────────────────── */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chipsContainer}
+        style={styles.chipsScroll}>
+        <Chip icon="quality-high" label={resLabel} />
+        <Chip icon="filmstrip" label={`${settings.fps} FPS`} />
+        <Chip
+          icon={settings.includeAudio ? 'microphone' : 'microphone-off'}
+          label={settings.includeAudio ? 'Ses Açık' : 'Sessiz'}
+          active={settings.includeAudio}
+        />
+        <Chip
+          icon="gesture-tap"
+          label="Dokunma"
+          active={settings.showTouches}
+        />
+      </ScrollView>
 
-      {/* Main Content */}
-      <View style={styles.centerArea}>
-        {/* Duration Display */}
-        {status.isRecording && (
-          <View style={styles.durationContainer}>
-            <View style={[
-              styles.statusDot,
-              {backgroundColor: status.isPaused ? Colors.paused : Colors.recording},
-            ]} />
-            <Text style={[
-              styles.duration,
-              {color: status.isPaused ? Colors.paused : Colors.recording},
-            ]}>
-              {formatDuration(status.duration)}
+      {/* ── Center area ─────────────────────────────────────────────────── */}
+      <View style={styles.center}>
+        {/* Radar rings behind the button */}
+        <View style={styles.ringsContainer}>
+          <RadarRing delay={0}    active={isRecording && !isPaused} color={ringColor} />
+          <RadarRing delay={500}  active={isRecording && !isPaused} color={ringColor} />
+          <RadarRing delay={1000} active={isRecording && !isPaused} color={ringColor} />
+        </View>
+
+        {/* The central button disc */}
+        <Animated.View
+          style={[
+            styles.discOuter,
+            !isRecording && {transform: [{scale: breathe}]},
+            isRecording && {
+              borderColor: ringColor,
+              borderWidth: 2.5,
+            },
+          ]}>
+          <View style={[styles.discInner, {backgroundColor: btnBg}]}>
+            <Icon
+              name={isRecording ? 'stop' : 'record'}
+              size={36}
+              color={Colors.white}
+            />
+          </View>
+        </Animated.View>
+
+        {/* Status text below disc */}
+        {isRecording ? (
+          <View style={styles.statusBlock}>
+            <Text style={[styles.timerText, {color: isPaused ? Colors.paused : Colors.white}]}>
+              {fmtDuration(status.duration)}
+            </Text>
+            <Text style={styles.statusLabel}>
+              {isPaused ? 'DURAKLATILDI' : 'KAYIT YAPILIYOR'}
             </Text>
           </View>
+        ) : (
+          <View style={styles.idleBlock}>
+            <Text style={styles.idleTitle}>Ekranı Kaydet</Text>
+            <Text style={styles.idleSub}>{resLabel} · {settings.fps} FPS · {settings.includeAudio ? 'Sesli' : 'Sessiz'}</Text>
+          </View>
         )}
+      </View>
 
-        {status.isRecording && (
-          <Text style={styles.statusLabel}>
-            {status.isPaused ? 'DURAKLATILDI' : 'KAYIT YAPILIYOR'}
-          </Text>
-        )}
-
-        {!status.isRecording && (
-          <Text style={styles.readyText}>Kayda Hazır</Text>
-        )}
-
-        {/* Main Record Button */}
-        <View style={styles.buttonContainer}>
-          {status.isRecording && (
-            <Animated.View style={[
-              styles.glowRing,
-              {
-                opacity: glowAnim,
-                borderColor: status.isPaused ? Colors.paused : Colors.recording,
-              },
-            ]} />
-          )}
-          <Animated.View style={[
-            styles.buttonOuter,
-            {transform: [{scale: pulseAnim}]},
-            status.isRecording && !status.isPaused && styles.buttonOuterRecording,
-            status.isPaused && styles.buttonOuterPaused,
-          ]}>
-            <TouchableOpacity
-              style={[
-                styles.recordButton,
-                status.isRecording && !status.isPaused && styles.recordButtonActive,
-                status.isPaused && styles.recordButtonPaused,
-              ]}
-              onPress={status.isRecording ? handleStopRecording : handleStartRecording}
-              activeOpacity={0.8}>
-              {status.isRecording ? (
-                <Icon name="stop" size={40} color={Colors.white} />
-              ) : (
-                <Icon name="record" size={44} color={Colors.white} />
-              )}
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
-
-        <Text style={styles.buttonLabel}>
-          {status.isRecording ? 'Kaydı Durdur' : 'Kaydı Başlat'}
-        </Text>
-
-        {/* Pause/Resume Button */}
-        {status.isRecording && (
+      {/* ── Bottom action area ───────────────────────────────────────────── */}
+      <View style={styles.bottomArea}>
+        {/* Pause / Resume row — only during recording */}
+        {isRecording && (
           <TouchableOpacity
-            style={[
-              styles.secondaryBtn,
-              status.isPaused && styles.secondaryBtnResume,
-            ]}
-            onPress={handlePauseResume}
-            activeOpacity={0.8}>
+            style={[styles.pauseRow, isPaused && styles.pauseRowResume]}
+            onPress={handlePause}
+            activeOpacity={0.75}>
             <Icon
-              name={status.isPaused ? 'play' : 'pause'}
-              size={20}
-              color={Colors.text}
-              style={styles.secondaryBtnIcon}
+              name={isPaused ? 'play' : 'pause'}
+              size={18}
+              color={isPaused ? Colors.success : Colors.textSecondary}
             />
-            <Text style={styles.secondaryBtnText}>
-              {status.isPaused ? 'Devam Et' : 'Duraklat'}
+            <Text style={[styles.pauseRowText, isPaused && {color: Colors.success}]}>
+              {isPaused ? 'Devam Et' : 'Duraklat'}
             </Text>
           </TouchableOpacity>
         )}
-      </View>
 
-      {/* Bottom Info */}
-      <View style={styles.bottomBar}>
-        <Text style={styles.versionText}>Velaud Recorder v2.1.0</Text>
+        {/* Main CTA pill (XRecorder-style) */}
+        <Animated.View style={{transform: [{scale: btnScale}]}}>
+          <TouchableOpacity
+            style={[
+              styles.ctaButton,
+              {backgroundColor: btnBg},
+            ]}
+            onPress={handleMain}
+            onPressIn={onPressIn}
+            onPressOut={onPressOut}
+            activeOpacity={1}>
+            <Icon
+              name={isRecording ? 'stop-circle-outline' : 'record-circle-outline'}
+              size={22}
+              color={Colors.white}
+              style={styles.ctaIcon}
+            />
+            <Text style={styles.ctaText}>
+              {isRecording ? 'Kaydı Durdur' : 'Kaydı Başlat'}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
       </View>
     </SafeAreaView>
   );
 }
 
+// ─── Styles ────────────────────────────────────────────────────────────────
+const DISC = 148;
+const RING_SIZE = DISC + 80;
+
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
     backgroundColor: Colors.background,
   },
+
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
   },
-  headerLeft: {
+  headerBrand: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-  logoContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+  logoMark: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: {
-    color: Colors.text,
+  brandName: {
+    color: Colors.white,
     fontSize: 22,
     fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: -0.3,
   },
-  settingsBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: Colors.surfaceElevated,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chipsRow: {
+  headerActions: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  recBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.primaryMuted,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: Colors.chipActiveBorder,
+  },
+  recDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: Colors.recording,
+  },
+  recBadgeText: {
+    color: Colors.recording,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+
+  // Feature chips
+  chipsScroll: {
+    flexGrow: 0,
+  },
+  chipsContainer: {
     paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingBottom: 8,
     gap: 8,
+    flexDirection: 'row',
   },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surfaceElevated,
+    gap: 6,
+    backgroundColor: Colors.chip,
     borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.chipBorder,
   },
   chipActive: {
-    borderColor: Colors.success,
-    backgroundColor: 'rgba(74, 222, 128, 0.08)',
-  },
-  chipInactive: {
-    borderColor: Colors.border,
-  },
-  chipIcon: {
-    marginRight: 6,
+    backgroundColor: Colors.chipActive,
+    borderColor: Colors.chipActiveBorder,
   },
   chipText: {
-    color: Colors.textSecondary,
-    fontSize: 13,
+    color: Colors.textMuted,
+    fontSize: 12,
     fontWeight: '600',
   },
-  centerArea: {
+  chipTextActive: {
+    color: Colors.primary,
+  },
+
+  // Center
+  center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 20,
   },
-  durationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 8,
-  },
-  statusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  duration: {
-    fontSize: 52,
-    fontWeight: '200',
-    letterSpacing: 4,
-    fontVariant: ['tabular-nums'],
-  },
-  statusLabel: {
-    color: Colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 3,
-    marginBottom: 32,
-  },
-  readyText: {
-    color: Colors.textMuted,
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 32,
-    letterSpacing: 1,
-  },
-  buttonContainer: {
-    width: 180,
-    height: 180,
+  ringsContainer: {
+    position: 'absolute',
+    width: RING_SIZE,
+    height: RING_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
   },
-  glowRing: {
+  radarRing: {
     position: 'absolute',
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    borderWidth: 3,
+    width: RING_SIZE,
+    height: RING_SIZE,
+    borderRadius: RING_SIZE / 2,
+    borderWidth: 1.5,
+    borderColor: Colors.recording,
   },
-  buttonOuter: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    borderWidth: 3,
+  discOuter: {
+    width: DISC + 24,
+    height: DISC + 24,
+    borderRadius: (DISC + 24) / 2,
+    borderWidth: 1.5,
     borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.surface,
   },
-  buttonOuterRecording: {
-    borderColor: Colors.recording,
-  },
-  buttonOuterPaused: {
-    borderColor: Colors.paused,
-  },
-  recordButton: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
+  discInner: {
+    width: DISC,
+    height: DISC,
+    borderRadius: DISC / 2,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 16,
+    // Elevation/shadow for premium look
+    elevation: 24,
     shadowColor: Colors.primary,
-    shadowOffset: {width: 0, height: 8},
+    shadowOffset: {width: 0, height: 12},
     shadowOpacity: 0.5,
-    shadowRadius: 20,
+    shadowRadius: 24,
   },
-  recordButtonActive: {
-    backgroundColor: Colors.recording,
-    shadowColor: Colors.recording,
-  },
-  recordButtonPaused: {
-    backgroundColor: Colors.paused,
-    shadowColor: Colors.paused,
-  },
-  buttonLabel: {
-    color: Colors.textSecondary,
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 20,
-  },
-  secondaryBtn: {
-    flexDirection: 'row',
+
+  // Status blocks
+  statusBlock: {
+    marginTop: 32,
     alignItems: 'center',
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: 28,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
+    gap: 6,
   },
-  secondaryBtnResume: {
-    borderColor: Colors.success,
-    backgroundColor: 'rgba(74, 222, 128, 0.08)',
+  timerText: {
+    fontSize: 48,
+    fontWeight: '200',
+    letterSpacing: 4,
+    fontVariant: ['tabular-nums'],
+    color: Colors.white,
   },
-  secondaryBtnIcon: {
-    marginRight: 8,
-  },
-  secondaryBtnText: {
-    color: Colors.text,
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  bottomBar: {
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  versionText: {
+  statusLabel: {
     color: Colors.textMuted,
     fontSize: 11,
-    opacity: 0.6,
+    fontWeight: '800',
+    letterSpacing: 2.5,
+  },
+  idleBlock: {
+    marginTop: 32,
+    alignItems: 'center',
+    gap: 6,
+  },
+  idleTitle: {
+    color: Colors.textSecondary,
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  idleSub: {
+    color: Colors.textMuted,
+    fontSize: 13,
+    letterSpacing: 0.5,
+  },
+
+  // Bottom area
+  bottomArea: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    gap: 10,
+  },
+  pauseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  pauseRowResume: {
+    borderColor: Colors.successMuted,
+    backgroundColor: Colors.successMuted,
+  },
+  pauseRowText: {
+    color: Colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  ctaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 18,
+    borderRadius: 18,
+    width: W - 40,
+    elevation: 12,
+    shadowColor: Colors.primary,
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+  },
+  ctaIcon: {},
+  ctaText: {
+    color: Colors.white,
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
 });

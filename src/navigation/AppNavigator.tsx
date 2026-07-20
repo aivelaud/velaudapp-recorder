@@ -1,7 +1,7 @@
 import React from 'react';
+import {View, StyleSheet} from 'react-native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import {View, StyleSheet, Platform} from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Colors} from '../theme/colors';
 import HomeScreen from '../screens/HomeScreen';
@@ -9,72 +9,95 @@ import VideosScreen from '../screens/VideosScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import RecordingPreviewScreen from '../screens/RecordingPreviewScreen';
 
+// ─── Navigation type definitions ────────────────────────────────────────────
 export type RootTabParamList = {
-  Record: undefined;
-  Videos: undefined;
+  Kayit: undefined;
+  Videolar: undefined;
+  Ayarlar: undefined;
 };
 
 export type RootStackParamList = {
   Main: undefined;
-  Settings: undefined;
   RecordingPreview: {filePath: string};
 };
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+// ─── Tab icon wrapper ─────────────────────────────────────────────────────
+function TabIcon({
+  name,
+  focused,
+}: {
+  name: string;
+  focused: boolean;
+}) {
+  return (
+    <View style={[styles.tabIconWrap, focused && styles.tabIconWrapActive]}>
+      <Icon
+        name={name}
+        size={22}
+        color={focused ? Colors.primary : Colors.textMuted}
+      />
+    </View>
+  );
+}
+
+// ─── Bottom Tabs ──────────────────────────────────────────────────────────
 function MainTabs() {
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
+        // Raise the tab bar clear of Android gesture nav bar.
+        // paddingBottom: 22 ensures it never overlaps the |||○< strip.
         tabBarStyle: {
           backgroundColor: Colors.surface,
-          borderTopColor: Colors.border,
           borderTopWidth: 1,
-          height: 72,
-          paddingBottom: 16,
+          borderTopColor: Colors.border,
+          height: 78,
+          paddingBottom: 22,
           paddingTop: 10,
-          elevation: 20,
-          shadowColor: '#000',
-          shadowOffset: {width: 0, height: -4},
-          shadowOpacity: 0.3,
-          shadowRadius: 8,
+          elevation: 0,
+          shadowOpacity: 0,
         },
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textMuted,
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '700',
-          letterSpacing: 0.5,
-          marginTop: 4,
+          letterSpacing: 0.4,
+          marginTop: 2,
         },
+        tabBarShowLabel: true,
       }}>
       <Tab.Screen
-        name="Record"
+        name="Kayit"
         component={HomeScreen}
         options={{
-          tabBarLabel: 'Kaydet',
-          tabBarIcon: ({focused, color}) => (
-            <Icon
-              name={focused ? 'record-circle' : 'record-circle-outline'}
-              size={24}
-              color={color}
-            />
+          tabBarLabel: 'Kayıt',
+          tabBarIcon: ({focused}) => (
+            <TabIcon name={focused ? 'record-circle' : 'record-circle-outline'} focused={focused} />
           ),
         }}
       />
       <Tab.Screen
-        name="Videos"
+        name="Videolar"
         component={VideosScreen}
         options={{
-          tabBarLabel: 'Videolarım',
-          tabBarIcon: ({focused, color}) => (
-            <Icon
-              name={focused ? 'filmstrip-box' : 'filmstrip-box-multiple'}
-              size={24}
-              color={color}
-            />
+          tabBarLabel: 'Videolar',
+          tabBarIcon: ({focused}) => (
+            <TabIcon name={focused ? 'play-box' : 'play-box-outline'} focused={focused} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Ayarlar"
+        component={SettingsScreen}
+        options={{
+          tabBarLabel: 'Ayarlar',
+          tabBarIcon: ({focused}) => (
+            <TabIcon name={focused ? 'cog' : 'cog-outline'} focused={focused} />
           ),
         }}
       />
@@ -82,40 +105,34 @@ function MainTabs() {
   );
 }
 
-function AppNavigator() {
+// ─── Root Stack ───────────────────────────────────────────────────────────
+export default function AppNavigator() {
   return (
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
         contentStyle: {backgroundColor: Colors.background},
+        animation: 'slide_from_right',
       }}>
       <Stack.Screen name="Main" component={MainTabs} />
       <Stack.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{
-          presentation: 'card',
-          headerShown: true,
-          headerTitle: 'Ayarlar',
-          headerStyle: {backgroundColor: Colors.surface},
-          headerTintColor: Colors.text,
-          headerTitleStyle: {fontWeight: '700', fontSize: 18},
-          headerBackTitle: '',
-          headerShadowVisible: false,
-        }}
-      />
-      <Stack.Screen
         name="RecordingPreview"
         component={RecordingPreviewScreen}
-        options={{
-          presentation: 'card',
-          headerShown: false,
-        }}
+        options={{animation: 'slide_from_bottom'}}
       />
     </Stack.Navigator>
   );
 }
 
-const styles = StyleSheet.create({});
-
-export default AppNavigator;
+const styles = StyleSheet.create({
+  tabIconWrap: {
+    width: 40,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+  },
+  tabIconWrapActive: {
+    backgroundColor: Colors.primaryMuted,
+  },
+});
