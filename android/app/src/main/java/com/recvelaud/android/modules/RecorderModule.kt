@@ -11,8 +11,6 @@ import android.os.IBinder
 import android.util.Log
 import com.facebook.react.bridge.*
 import com.facebook.react.modules.core.DeviceEventManagerModule
-import com.facebook.react.modules.core.PermissionAwareActivity
-import com.facebook.react.modules.core.PermissionListener
 import com.recvelaud.android.services.ScreenRecordService
 
 class RecorderModule(private val reactContext: ReactApplicationContext) :
@@ -34,8 +32,6 @@ class RecorderModule(private val reactContext: ReactApplicationContext) :
         ScreenRecordService.reactContext = reactContext
     }
 
-    // BaseActivityEventListener is an abstract class, not a SAM interface — must use
-    // object expression (lambda syntax causes "Too many arguments for constructor" error).
     private val activityResultListener = object : BaseActivityEventListener() {
         override fun onActivityResult(activity: Activity?, requestCode: Int, resultCode: Int, data: Intent?) {
             if (requestCode == REQUEST_MEDIA_PROJECTION) {
@@ -44,6 +40,7 @@ class RecorderModule(private val reactContext: ReactApplicationContext) :
                 if (resultCode == Activity.RESULT_OK && data != null) {
                     startRecordingService(resultCode, data, pendingConfig, promise)
                 } else {
+                    Log.w(TAG, "MediaProjection permission denied by user")
                     promise.resolve(false)
                 }
             }
@@ -56,21 +53,27 @@ class RecorderModule(private val reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun startRecording(config: ReadableMap, promise: Promise) {
-        if (recordService?.isRecordingActive() == true) {
-            Log.w(TAG, "startRecording called while a recording is already active — ignoring")
-            promise.resolve(true)
-            return
-        }
-        val activity = currentActivity ?: run {
-            promise.reject("NO_ACTIVITY", "Activity not available")
-            return
-        }
-        pendingPromise = promise
-        pendingConfig = config
+        try {
+            if (recordService?.isRecordingActive() == true) {
+                Log.w(TAG, "startRecording called while already active — ignoring")
+                promise.resolve(true)
+                return
+            }
+            val activity = currentActivity ?: run {
+                promise.reject("NO_ACTIVITY", "Activity not available")
+                return
+            }
+            pendingPromise = promise
+            pendingConfig = config
 
-        val projManager = activity.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-        val captureIntent = projManager.createScreenCaptureIntent()
-        activity.startActivityForResult(captureIntent, REQUEST_MEDIA_PROJECTION)
+            val projManager = activity.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            val captureIntent = projManager.createScreenCaptureIntent()
+            activity.startActivityForResult(captureIntent, REQUEST_MEDIA_PROJECTION)
+        } catch (e: Exception) {
+            Log.e(TAG, "startRecording error", e)
+            pendingPromise = null
+            promise.reject("START_ERROR", e.message)
+        }
     }
 
     private fun startRecordingService(resultCode: Int, resultData: Intent, config: ReadableMap?, promise: Promise) {
@@ -96,19 +99,23 @@ class RecorderModule(private val reactContext: ReactApplicationContext) :
                 putExtra(ScreenRecordService.EXTRA_INCLUDE_AUDIO, includeAudio)
             }
 
+            // CRITICAL: Use startForegroundService on Android O+ to ensure the
+            // service can call startForeground() within the time limit
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 reactApplicationContext.startForegroundService(intent)
             } else {
                 reactApplicationContext.startService(intent)
             }
 
-            // Bind to service for pause/resume
+            // Bind to service for pause/resume control
             val conn = object : ServiceConnection {
                 override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
                     recordService = (binder as? ScreenRecordService.RecordBinder)?.service
+                    Log.i(TAG, "Service connected, recording active: ${recordService?.isRecordingActive()}")
                     promise.resolve(true)
                 }
                 override fun onServiceDisconnected(name: ComponentName?) {
+                    Log.w(TAG, "Service disconnected unexpectedly")
                     recordService = null
                 }
             }
@@ -127,30 +134,51 @@ class RecorderModule(private val reactContext: ReactApplicationContext) :
             if (svc != null) {
                 svc.stopRecording()
             } else {
+                // Fallback: send stop action to service directly
                 val intent = Intent(reactApplicationContext, ScreenRecordService::class.java).apply {
                     action = ScreenRecordService.ACTION_STOP
                 }
-                reactApplicationContext.startService(intent)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    try {
+                        reactApplicationContext.startForegroundService(intent)
+                    } catch (_: Exception) {
+                        reactApplicationContext.startService(intent)
+                    }
+                } else {
+                    reactApplicationContext.startService(intent)
+                }
             }
-            serviceConnection?.let { reactApplicationContext.unbindService(it) }
+            // Unbind service
+            try {
+                serviceConnection?.let { reactApplicationContext.unbindService(it) }
+            } catch (_: Exception) {}
             serviceConnection = null
             recordService = null
             promise.resolve(null)
         } catch (e: Exception) {
+            Log.e(TAG, "stopRecording error", e)
             promise.reject("STOP_ERROR", e.message)
         }
     }
 
     @ReactMethod
     fun pauseRecording(promise: Promise) {
-        recordService?.pauseRecording()
-        promise.resolve(null)
+        try {
+            recordService?.pauseRecording()
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("PAUSE_ERROR", e.message)
+        }
     }
 
     @ReactMethod
     fun resumeRecording(promise: Promise) {
-        recordService?.resumeRecording()
-        promise.resolve(null)
+        try {
+            recordService?.resumeRecording()
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("RESUME_ERROR", e.message)
+        }
     }
 
     @ReactMethod
@@ -180,30 +208,26 @@ class RecorderModule(private val reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun checkPermissions(promise: Promise) {
-        val activity = currentActivity
-        if (activity == null) {
+        try {
+            val overlayGranted = android.provider.Settings.canDrawOverlays(reactApplicationContext)
+            promise.resolve(overlayGranted)
+        } catch (e: Exception) {
             promise.resolve(false)
-            return
         }
-        // Check overlay permission
-        val overlayGranted = android.provider.Settings.canDrawOverlays(reactApplicationContext)
-        promise.resolve(overlayGranted)
     }
 
     @ReactMethod
     fun requestPermissions(promise: Promise) {
-        val activity = currentActivity
-        if (activity == null) {
-            promise.reject("NO_ACTIVITY", "Activity not available")
-            return
+        try {
+            val intent = android.content.Intent(
+                android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                android.net.Uri.parse("package:${reactApplicationContext.packageName}")
+            ).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
+            reactApplicationContext.startActivity(intent)
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("PERMISSION_ERROR", e.message)
         }
-        // Request overlay permission
-        val intent = android.content.Intent(
-            android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-            android.net.Uri.parse("package:${reactApplicationContext.packageName}")
-        ).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
-        reactApplicationContext.startActivity(intent)
-        promise.resolve(null)
     }
 
     @ReactMethod

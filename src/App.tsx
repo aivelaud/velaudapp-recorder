@@ -6,9 +6,7 @@ import {enableScreens} from 'react-native-screens';
 import AppNavigator from './navigation/AppNavigator';
 import {Colors} from './theme/colors';
 
-// Enable native screens optimisation — must be called before any navigator
-// renders. Prevents react-native-screens from crashing on first render in
-// release builds where the native component registry is strict.
+// Enable native screens optimisation
 enableScreens();
 
 LogBox.ignoreLogs([

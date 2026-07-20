@@ -7,6 +7,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
 
+    <!-- POST_NOTIFICATIONS required for Android 13+ foreground service notification -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Storage (Android < 13) -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
@@ -14,6 +17,9 @@
         tools:ignore="ScopedStorage" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+
+    <!-- Read media for video library (Android 13+) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
 
     <!-- Floating panel (overlay) -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -36,7 +42,7 @@
         android:allowBackup="false"
         android:theme="@style/AppTheme"
         android:hardwareAccelerated="true"
-        tools:targetApi="33">
+        tools:targetApi="34">
 
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
@@ -62,7 +68,7 @@
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
 
-        <!-- Crash reporter — launched by global UncaughtExceptionHandler -->
+        <!-- Crash reporter -->
         <activity
             android:name=".CrashActivity"
             android:exported="false"

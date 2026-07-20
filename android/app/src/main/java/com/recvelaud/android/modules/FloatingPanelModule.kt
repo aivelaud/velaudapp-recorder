@@ -10,16 +10,20 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.util.Log
 import com.facebook.react.bridge.*
 import com.recvelaud.android.services.ScreenRecordService
 
 class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
+
+    companion object {
+        private const val TAG = "FloatingPanelModule"
+    }
 
     override fun getName(): String = "FloatingPanelModule"
 
@@ -29,55 +33,79 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun checkOverlayPermission(promise: Promise) {
-        promise.resolve(Settings.canDrawOverlays(reactContext))
+        try {
+            val canDraw = Settings.canDrawOverlays(reactContext)
+            Log.d(TAG, "checkOverlayPermission: $canDraw")
+            promise.resolve(canDraw)
+        } catch (e: Exception) {
+            Log.e(TAG, "checkOverlayPermission error", e)
+            promise.resolve(false)
+        }
     }
 
     @ReactMethod
     fun requestOverlayPermission(promise: Promise) {
-        val intent = Intent(
-            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-            Uri.parse("package:${reactContext.packageName}")
-        ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
-        reactContext.startActivity(intent)
-        promise.resolve(null)
+        try {
+            val intent = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:${reactContext.packageName}")
+            ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+            reactContext.startActivity(intent)
+            promise.resolve(null)
+        } catch (e: Exception) {
+            Log.e(TAG, "requestOverlayPermission error", e)
+            promise.reject("PERMISSION_ERROR", e.message)
+        }
     }
 
     @ReactMethod
     fun showPanel(promise: Promise) {
         try {
             if (!Settings.canDrawOverlays(reactContext)) {
-                android.util.Log.w("FloatingPanelModule", "Overlay permission not granted, requesting...")
-                // Don't reject immediately - panel will be shown after user grants permission
+                Log.w(TAG, "Overlay permission not granted")
+                // Don't reject - recording still works, just no floating panel
                 promise.resolve(null)
                 return
             }
             if (floatingView != null) {
-                android.util.Log.d("FloatingPanelModule", "Panel already showing")
+                Log.d(TAG, "Panel already showing")
                 promise.resolve(null)
                 return
             }
-            windowManager = reactContext.getSystemService(android.content.Context.WINDOW_SERVICE) as WindowManager
-            buildAndShowPanel()
-            android.util.Log.i("FloatingPanelModule", "Panel shown successfully")
+
+            // Must run on main thread for WindowManager operations
+            val handler = android.os.Handler(android.os.Looper.getMainLooper())
+            handler.post {
+                try {
+                    windowManager = reactContext.getSystemService(android.content.Context.WINDOW_SERVICE) as WindowManager
+                    buildAndShowPanel()
+                    Log.i(TAG, "Panel shown successfully")
+                } catch (e: WindowManager.BadTokenException) {
+                    Log.e(TAG, "BadTokenException - overlay permission may need re-grant", e)
+                    floatingView = null
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error showing panel on main thread", e)
+                    floatingView = null
+                }
+            }
             promise.resolve(null)
-        } catch (e: WindowManager.BadTokenException) {
-            // Overlay permission looked granted but the OS refused to attach the
-            // window (can happen right after the user grants the permission,
-            // before the app process re-syncs). Never let this crash recording.
-            android.util.Log.e("FloatingPanelModule", "BadTokenException adding overlay window", e)
-            floatingView = null
-            promise.reject("PANEL_ERROR", "Kontrol paneli eklenemedi, izin ayarını tekrar kontrol edin.")
         } catch (e: Exception) {
-            android.util.Log.e("FloatingPanelModule", "Error showing panel", e)
+            Log.e(TAG, "showPanel error", e)
             floatingView = null
-            promise.reject("PANEL_ERROR", "Panel gösterilemedi: ${e.message}")
+            promise.resolve(null) // Don't reject - recording still works
         }
     }
 
     @ReactMethod
     fun hidePanel(promise: Promise) {
-        removePanel()
-        promise.resolve(null)
+        try {
+            val handler = android.os.Handler(android.os.Looper.getMainLooper())
+            handler.post { removePanel() }
+            promise.resolve(null)
+        } catch (e: Exception) {
+            Log.e(TAG, "hidePanel error", e)
+            promise.resolve(null)
+        }
     }
 
     private fun buildAndShowPanel() {
@@ -95,7 +123,7 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
         expandedPanel.visibility = View.GONE
         container.addView(expandedPanel)
 
-        // Toggle expand/collapse on single tap
+        // Touch handling for drag + tap
         var downX = 0f
         var downY = 0f
         var isDragging = false
@@ -107,12 +135,15 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
                 @Suppress("DEPRECATION")
                 WindowManager.LayoutParams.TYPE_PHONE
             flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
             width = WindowManager.LayoutParams.WRAP_CONTENT
             height = WindowManager.LayoutParams.WRAP_CONTENT
             gravity = Gravity.TOP or Gravity.START
             x = 40
             y = 300
+            // CRITICAL: Set format to translucent for proper overlay rendering
+            format = android.graphics.PixelFormat.TRANSLUCENT
         }
 
         container.setOnTouchListener { _, event ->
@@ -126,13 +157,15 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
                 MotionEvent.ACTION_MOVE -> {
                     val dx = event.rawX - downX
                     val dy = event.rawY - downY
-                    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+                    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
                         isDragging = true
                         params.x = (params.x + dx).toInt()
                         params.y = (params.y + dy).toInt()
                         downX = event.rawX
                         downY = event.rawY
-                        windowManager?.updateViewLayout(container, params)
+                        try {
+                            windowManager?.updateViewLayout(container, params)
+                        } catch (_: Exception) {}
                     }
                     true
                 }
@@ -156,9 +189,9 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
     private fun buildPill(ctx: android.content.Context): View {
         val pill = FrameLayout(ctx)
         val bg = GradientDrawable().apply {
-            setColor(Color.parseColor("#E0E53935"))
+            setColor(Color.parseColor("#E06C63FF"))
             cornerRadius = 50f
-            setStroke(3, Color.parseColor("#FFFFFFFF"))
+            setStroke(2, Color.parseColor("#FFFFFFFF"))
         }
         pill.background = bg
 
@@ -176,7 +209,7 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
         }
         pill.addView(dot, dotParams)
         
-        // Add pulsing animation to the dot
+        // Pulsing animation
         android.animation.ObjectAnimator.ofFloat(dot, "alpha", 1f, 0.3f).apply {
             duration = 800
             repeatCount = android.animation.ObjectAnimator.INFINITE
@@ -193,17 +226,17 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
             setPadding(20.dp(ctx), 16.dp(ctx), 20.dp(ctx), 16.dp(ctx))
         }
         val bg = GradientDrawable().apply {
-            setColor(Color.parseColor("#F0E53935"))
+            setColor(Color.parseColor("#F06C63FF"))
             cornerRadius = 20f
-            setStroke(3, Color.parseColor("#FFFFFFFF"))
+            setStroke(2, Color.parseColor("#FFFFFFFF"))
         }
         panel.background = bg
 
         // Duration text
         val durationTv = TextView(ctx).apply {
-            text = "00:00:00"
+            text = "⏺ REC"
             setTextColor(Color.WHITE)
-            textSize = 22f
+            textSize = 18f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, 12.dp(ctx))
@@ -215,22 +248,31 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
-        val pauseBtn = buildPanelButton(ctx, "⏸", "Pause") {
+        val pauseBtn = buildPanelButton(ctx, "⏸", "Duraklat") {
             val intent = Intent(ctx, ScreenRecordService::class.java).apply {
                 action = ScreenRecordService.ACTION_PAUSE
             }
-            ctx.startService(intent)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ctx.startForegroundService(intent)
+            } else {
+                ctx.startService(intent)
+            }
         }
-        val stopBtn = buildPanelButton(ctx, "⏹", "Stop") {
+        val stopBtn = buildPanelButton(ctx, "⏹", "Durdur") {
             val intent = Intent(ctx, ScreenRecordService::class.java).apply {
                 action = ScreenRecordService.ACTION_STOP
             }
-            ctx.startService(intent)
-            removePanel()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ctx.startForegroundService(intent)
+            } else {
+                ctx.startService(intent)
+            }
+            val handler = android.os.Handler(android.os.Looper.getMainLooper())
+            handler.postDelayed({ removePanel() }, 300)
         }
         row.addView(pauseBtn)
         
-        // Add spacing between buttons
+        // Spacer
         val spacer = View(ctx).apply {
             layoutParams = LinearLayout.LayoutParams(12.dp(ctx), 1)
         }
@@ -245,7 +287,7 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
         val btn = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(16.dp(ctx), 12.dp(ctx), 16.dp(ctx), 12.dp(ctx))
+            setPadding(16.dp(ctx), 10.dp(ctx), 16.dp(ctx), 10.dp(ctx))
             val btnBg = GradientDrawable().apply {
                 setColor(Color.parseColor("#FFFFFF"))
                 cornerRadius = 12f
@@ -256,16 +298,16 @@ class FloatingPanelModule(private val reactContext: ReactApplicationContext) :
         
         val iconTv = TextView(ctx).apply {
             text = icon
-            textSize = 24f
-            setTextColor(Color.parseColor("#E53935"))
+            textSize = 22f
+            setTextColor(Color.parseColor("#6C63FF"))
             gravity = Gravity.CENTER
         }
         btn.addView(iconTv)
         
         val labelTv = TextView(ctx).apply {
             text = label
-            textSize = 11f
-            setTextColor(Color.parseColor("#666666"))
+            textSize = 10f
+            setTextColor(Color.parseColor("#444444"))
             gravity = Gravity.CENTER
             setPadding(0, 4.dp(ctx), 0, 0)
         }
