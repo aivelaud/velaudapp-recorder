@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native/async-storage/async-storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Platform} from 'react-native';
 
 export type ResolutionOption = '144p' | '240p' | '360p' | '480p' | '720p' | '1080p';
