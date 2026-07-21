@@ -11,6 +11,8 @@ import VideosScreen from '../screens/VideosScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import RecordingPreviewScreen from '../screens/RecordingPreviewScreen';
 import VideoEditorScreen from '../screens/VideoEditorScreen';
+import LiveStreamScreen from '../screens/LiveStreamScreen';
+import type {ChatPlatform} from '../modules/LiveChatModule';
 
 // ─── Navigation type definitions ────────────────────────────────────────────
 export type RootTabParamList = {
@@ -23,6 +25,7 @@ export type RootStackParamList = {
   Main: undefined;
   RecordingPreview: {filePath: string};
   VideoEditor: {filePath: string};
+  LiveStream: {platform: ChatPlatform};
 };
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -129,6 +132,11 @@ export default function AppNavigator() {
         name="VideoEditor"
         component={VideoEditorScreen}
         options={{animation: 'slide_from_right'}}
+      />
+      <Stack.Screen
+        name="LiveStream"
+        component={LiveStreamScreen}
+        options={{animation: 'slide_from_bottom'}}
       />
     </Stack.Navigator>
   );

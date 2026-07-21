@@ -27,6 +27,7 @@ import {
 import {SettingsManager, AppSettings} from '../modules/SettingsManager';
 import i18n from '../modules/i18n';
 import {RootStackParamList} from '../navigation/AppNavigator';
+import type {ChatPlatform} from '../modules/LiveChatModule';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -305,17 +306,9 @@ export default function HomeScreen() {
     } catch {}
   }, [status.isPaused]);
 
-  const toggleAudio = useCallback(async () => {
-    const next = settings.audioSource === 'none' ? 'microphone' : 'none';
-    setSettings({...settings, audioSource: next});
-    await SettingsManager.save({audioSource: next});
-  }, [settings]);
-
-  const toggleTouches = useCallback(async () => {
-    const updated = {...settings, showTouches: !settings.showTouches};
-    setSettings(updated);
-    await SettingsManager.save({showTouches: updated.showTouches});
-  }, [settings]);
+  const goToLiveStream = useCallback((platform: ChatPlatform) => {
+    navigation.navigate('LiveStream', {platform});
+  }, [navigation]);
 
   const goToSettings = useCallback(() => {
     navigation.getParent()?.navigate('Ayarlar' as never);
@@ -356,26 +349,19 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* ── Feature chips ───────────────────────────────────────────────── */}
+      {/* ── Live stream platform buttons ────────────────────────────────── */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chipsContainer}
         style={styles.chipsScroll}>
-        <Chip icon="quality-high" label={resLabel} onPress={goToSettings} />
-        <Chip icon="filmstrip" label={`${settings.fps} FPS`} onPress={goToSettings} />
-        <Chip
-          icon={hasAudio ? 'microphone' : 'microphone-off'}
-          label={hasAudio ? i18n.t('home.audioOn') : i18n.t('home.audioOff')}
-          active={hasAudio}
-          onPress={toggleAudio}
-        />
-        <Chip
-          icon="gesture-tap"
-          label={i18n.t('home.touches')}
-          active={settings.showTouches}
-          onPress={toggleTouches}
-        />
+        {PLATFORM_LOGOS.map(p => (
+          <LivePlatformButton
+            key={p.key}
+            platform={p}
+            onPress={() => goToLiveStream(p.key)}
+          />
+        ))}
       </ScrollView>
 
       {/* ── Center area ─────────────────────────────────────────────────── */}
@@ -538,28 +524,21 @@ const styles = StyleSheet.create({
     gap: 8,
     flexDirection: 'row',
   },
-  chip: {
+  liveChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 7,
     backgroundColor: Colors.chip,
     borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderWidth: 1,
     borderColor: Colors.chipBorder,
   },
-  chipActive: {
-    backgroundColor: Colors.chipActive,
-    borderColor: Colors.chipActiveBorder,
-  },
-  chipText: {
-    color: Colors.textMuted,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  chipTextActive: {
-    color: Colors.primary,
+  liveChipText: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
   },
 
   // Center

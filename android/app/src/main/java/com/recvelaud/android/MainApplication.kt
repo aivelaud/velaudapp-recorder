@@ -16,6 +16,8 @@ import com.recvelaud.android.modules.FloatingPanelPackage
 import com.recvelaud.android.modules.VideoLibraryPackage
 import com.recvelaud.android.modules.PreviewOverlayPackage
 import com.recvelaud.android.modules.VideoEditorPackage
+import com.recvelaud.android.modules.LiveStreamPackage
+import com.recvelaud.android.modules.LiveChatPackage
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -33,7 +35,9 @@ class MainApplication : Application(), ReactApplication {
                     FloatingPanelPackage(),
                     VideoLibraryPackage(),
                     PreviewOverlayPackage(),
-                    VideoEditorPackage()
+                    VideoEditorPackage(),
+                    LiveStreamPackage(),
+                    LiveChatPackage()
                 )
 
             override fun getJSMainModuleName(): String = "index"
