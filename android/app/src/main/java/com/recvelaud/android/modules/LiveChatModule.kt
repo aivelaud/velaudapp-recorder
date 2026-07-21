@@ -83,7 +83,7 @@ class LiveChatModule(private val reactContext: ReactApplicationContext) :
             val platform = config.getString("platform") ?: ""
             val channel = config.getString("channel") ?: ""
             val token = if (config.hasKey("token")) config.getString("token") else null
-            val username = if (config.hasKey("username")) config.getString("username") else channel
+            val username = if (config.hasKey("username")) config.getString("username") ?: channel else channel
 
             when (platform) {
                 "twitch" -> sendTwitchMessage(channel, token, username, message)
@@ -132,7 +132,7 @@ class LiveChatModule(private val reactContext: ReactApplicationContext) :
 
                 emitChatStatus("connected")
 
-                var line: String?
+                var line: String? = null
                 while (isActive.get() && reader.readLine().also { line = it } != null) {
                     val msg = line ?: continue
                     if (msg.startsWith("PING")) {
