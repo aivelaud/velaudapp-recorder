@@ -261,11 +261,13 @@ class RecorderModule(private val reactContext: ReactApplicationContext) :
             }
 
             // Refresh rate → max FPS cap
-            val refreshRate = metrics.refreshRate
+            val display = (reactContext.currentActivity?.getSystemService(android.content.Context.WINDOW_SERVICE)
+                as? android.view.WindowManager)?.defaultDisplay
+            val refreshRate = display?.refreshRate ?: 60f
             val maxFps: Int = when {
-                refreshRate >= 115 -> 120
-                refreshRate >= 85 -> 90
-                refreshRate >= 55 -> 60
+                refreshRate >= 115f -> 120
+                refreshRate >= 85f -> 90
+                refreshRate >= 55f -> 60
                 else -> 30
             }
 
