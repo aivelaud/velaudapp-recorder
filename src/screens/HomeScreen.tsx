@@ -93,32 +93,27 @@ function PulseRing({active, color}: {active: boolean; color: string}) {
   );
 }
 
-// ─── Feature Chip ──────────────────────────────────────────────────────────
-function Chip({
-  icon,
-  label,
-  active,
+// ─── Live Stream Platform Button ────────────────────────────────────────────
+const PLATFORM_LOGOS: {key: ChatPlatform; label: string; icon: string; color: string}[] = [
+  {key: 'youtube', label: 'YouTube', icon: 'youtube', color: '#FF0000'},
+  {key: 'twitch', label: 'Twitch', icon: 'twitch', color: '#9146FF'},
+  {key: 'kick', label: 'Kick', icon: 'kick', color: '#53FC18'},
+];
+
+function LivePlatformButton({
+  platform,
   onPress,
 }: {
-  icon: string;
-  label: string;
-  active?: boolean;
-  onPress?: () => void;
+  platform: {key: ChatPlatform; label: string; icon: string; color: string};
+  onPress: () => void;
 }) {
   return (
     <TouchableOpacity
-      style={[styles.chip, active && styles.chipActive]}
+      style={styles.liveChip}
       onPress={onPress}
-      activeOpacity={onPress ? 0.65 : 1}
-      disabled={!onPress}>
-      <Icon
-        name={icon}
-        size={13}
-        color={active ? Colors.primary : Colors.textMuted}
-      />
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>
-        {label}
-      </Text>
+      activeOpacity={0.7}>
+      <Icon name={platform.icon} size={16} color={platform.color} />
+      <Text style={styles.liveChipText}>{platform.label}</Text>
     </TouchableOpacity>
   );
 }
