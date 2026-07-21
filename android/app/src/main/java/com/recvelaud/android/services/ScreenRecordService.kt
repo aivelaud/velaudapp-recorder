@@ -90,6 +90,7 @@ class ScreenRecordService : Service() {
     private var sensorManager: SensorManager? = null
     private var shakeListener: SensorEventListener? = null
     private var lastShakeMs = 0L
+    private var hidePopup = false
 
     override fun onBind(intent: Intent?): IBinder = binder
 
@@ -165,7 +166,7 @@ class ScreenRecordService : Service() {
         val volume = intent.getIntExtra(EXTRA_VOLUME, 100)
         val noiseReduction = intent.getBooleanExtra(EXTRA_NOISE_REDUCTION, false)
         val countdownStr = intent.getStringExtra(EXTRA_COUNTDOWN) ?: "3s"
-        val hidePopup = intent.getBooleanExtra(EXTRA_HIDE_POPUP, false)
+        hidePopup = intent.getBooleanExtra(EXTRA_HIDE_POPUP, false)
         val shakeToStop = intent.getBooleanExtra(EXTRA_SHAKE_TO_STOP, false)
         val shakeSensitivity = intent.getIntExtra(EXTRA_SHAKE_SENSITIVITY, 50)
 
@@ -330,7 +331,6 @@ class ScreenRecordService : Service() {
                 "10s" -> 10
                 else -> 3
             }
-            val onHidePopup = hidePopup
             val onShakeToStop = shakeToStop
             val onShakeSens = shakeSensitivity
             showCountdownOverlay(countdownSeconds) {
