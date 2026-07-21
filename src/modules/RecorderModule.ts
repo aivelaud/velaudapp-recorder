@@ -10,6 +10,7 @@ export interface RecordingConfig {
   videoBitRate?: number;
   showTouches?: boolean;
   includeAudio?: boolean;
+  audioSource?: string;
 }
 
 export interface RecordingStatus {
@@ -82,6 +83,11 @@ class RecorderModuleClass {
   async requestPermissions(): Promise<boolean> {
     if (!ScreenRecorderModule) return false;
     return ScreenRecorderModule.requestPermissions();
+  }
+
+  async getDeviceCapabilities(): Promise<{maxResolution: string; maxFps: number; refreshRate: number}> {
+    if (!ScreenRecorderModule) return {maxResolution: '1080p', maxFps: 60, refreshRate: 60};
+    return ScreenRecorderModule.getDeviceCapabilities();
   }
 
   onRecordingStatus(callback: (status: RecordingStatus) => void) {

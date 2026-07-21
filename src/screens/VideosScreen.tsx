@@ -175,6 +175,10 @@ export default function VideosScreen() {
     );
   }, []);
 
+  const handleEdit = useCallback((item: VideoItem) => {
+    navigation.navigate('VideoEditor', {filePath: item.filePath});
+  }, [navigation]);
+
   const handleShare = useCallback(async (item: VideoItem) => {
     try {
       await Share.share({

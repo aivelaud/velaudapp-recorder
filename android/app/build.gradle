@@ -20,8 +20,8 @@ android {
         applicationId "com.recvelaud.android"
         minSdk rootProject.ext.minSdkVersion
         targetSdk rootProject.ext.targetSdkVersion
-        versionCode 17
-        versionName "2.4.0"
+        versionCode 18
+        versionName "2.5.0"
         multiDexEnabled true
     }
 
@@ -116,4 +116,5 @@ dependencies {
     implementation project(':react-native-video')
     implementation project(':react-native-async-storage')
     implementation project(':react-native-share')
+    implementation project(':react-native-community-slider')
 }

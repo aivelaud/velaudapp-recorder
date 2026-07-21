@@ -89,6 +89,9 @@ class RecorderModule(private val reactContext: ReactApplicationContext) :
                 config.getInt("height") else metrics.heightPixels
             val fps = if (config?.hasKey("fps") == true) config.getInt("fps") else 30
             val includeAudio = config?.getBoolean("includeAudio") ?: true
+            val audioSource = config?.getString("audioSource") ?: "microphone"
+            val volume = if (config?.hasKey("volume") == true) config.getInt("volume") else 100
+            val noiseReduction = config?.getBoolean("noiseReduction") ?: false
 
             val intent = Intent(reactApplicationContext, ScreenRecordService::class.java).apply {
                 putExtra(ScreenRecordService.EXTRA_RESULT_CODE, resultCode)
@@ -97,6 +100,9 @@ class RecorderModule(private val reactContext: ReactApplicationContext) :
                 putExtra(ScreenRecordService.EXTRA_HEIGHT, height)
                 putExtra(ScreenRecordService.EXTRA_FPS, fps)
                 putExtra(ScreenRecordService.EXTRA_INCLUDE_AUDIO, includeAudio)
+                putExtra(ScreenRecordService.EXTRA_AUDIO_SOURCE, audioSource)
+                putExtra(ScreenRecordService.EXTRA_VOLUME, volume)
+                putExtra(ScreenRecordService.EXTRA_NOISE_REDUCTION, noiseReduction)
             }
 
             // CRITICAL: Use startForegroundService on Android O+ to ensure the
@@ -235,4 +241,48 @@ class RecorderModule(private val reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun removeListeners(count: Int) {}
+
+    @ReactMethod
+    fun getDeviceCapabilities(promise: Promise) {
+        try {
+            val metrics = reactContext.resources.displayMetrics
+            val w = metrics.widthPixels
+            val h = metrics.heightPixels
+            val maxDim = maxOf(w, h)
+
+            // Cap resolution by physical screen height
+            val maxRes: String = when {
+                maxDim >= 1920 -> "1080p"
+                maxDim >= 1280 -> "720p"
+                maxDim >= 854 -> "480p"
+                maxDim >= 640 -> "360p"
+                maxDim >= 426 -> "240p"
+                else -> "144p"
+            }
+
+            // Refresh rate → max FPS cap
+            val refreshRate = metrics.refreshRate
+            val maxFps: Int = when {
+                refreshRate >= 115 -> 120
+                refreshRate >= 85 -> 90
+                refreshRate >= 55 -> 60
+                else -> 30
+            }
+
+            val map = Arguments.createMap().apply {
+                putString("maxResolution", maxRes)
+                putInt("maxFps", maxFps)
+                putDouble("refreshRate", refreshRate.toDouble())
+            }
+            promise.resolve(map)
+        } catch (e: Exception) {
+            // Safe fallback
+            val map = Arguments.createMap().apply {
+                putString("maxResolution", "1080p")
+                putInt("maxFps", 60)
+                putDouble("refreshRate", 60.0)
+            }
+            promise.resolve(map)
+        }
+    }
 }

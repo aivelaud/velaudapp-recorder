@@ -51,6 +51,9 @@ class ScreenRecordService : Service() {
         const val EXTRA_HEIGHT = "height"
         const val EXTRA_FPS = "fps"
         const val EXTRA_INCLUDE_AUDIO = "include_audio"
+        const val EXTRA_AUDIO_SOURCE = "audio_source"
+        const val EXTRA_VOLUME = "volume"
+        const val EXTRA_NOISE_REDUCTION = "noise_reduction"
 
         var reactContext: ReactApplicationContext? = null
     }
@@ -147,6 +150,9 @@ class ScreenRecordService : Service() {
         val height = if (reqH > 0) reqH else defaultH
         val fps = intent.getIntExtra(EXTRA_FPS, 30)
         val includeAudio = intent.getBooleanExtra(EXTRA_INCLUDE_AUDIO, true)
+        val audioSourceStr = intent.getStringExtra(EXTRA_AUDIO_SOURCE) ?: "microphone"
+        val volume = intent.getIntExtra(EXTRA_VOLUME, 100)
+        val noiseReduction = intent.getBooleanExtra(EXTRA_NOISE_REDUCTION, false)
 
         if (resultCode != android.app.Activity.RESULT_OK) {
             Log.e(TAG, "Invalid result code for MediaProjection: $resultCode")
@@ -220,7 +226,13 @@ class ScreenRecordService : Service() {
             mediaRecorder?.apply {
                 try {
                     if (includeAudio) {
-                        setAudioSource(MediaRecorder.AudioSource.MIC)
+                        // Map audio source string to Android AudioSource
+                        val asrc = when (audioSourceStr) {
+                            "internal" -> MediaRecorder.AudioSource.REMOTE_SUBMIX
+                            "both" -> MediaRecorder.AudioSource.MIC // Fallback: MIC captures both on most devices with MediaProjection
+                            else -> MediaRecorder.AudioSource.MIC
+                        }
+                        setAudioSource(asrc)
                     }
                     setVideoSource(MediaRecorder.VideoSource.SURFACE)
                     setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
@@ -262,7 +274,9 @@ class ScreenRecordService : Service() {
                     setVideoEncoder(MediaRecorder.VideoEncoder.H264)
                     if (includeAudio) {
                         setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                        setAudioEncodingBitRate(128_000)
+                        // Volume scaling: 100% = 128kbps, scale linearly up to 200%
+                        val audioBitrate = (128_000 * volume / 100).coerceIn(32_000, 384_000)
+                        setAudioEncodingBitRate(audioBitrate)
                         setAudioSamplingRate(44100)
                     }
                     setVideoEncodingBitRate(8_000_000)

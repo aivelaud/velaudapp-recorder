@@ -56,4 +56,8 @@ include(":react-native-share")
 project(":react-native-share").projectDir =
     File("../node_modules/react-native-share/android")
 
+include(":react-native-community-slider")
+project(":react-native-community-slider").projectDir =
+    File("../node_modules/@react-native-community/slider/android")
+
 includeBuild("../node_modules/@react-native/gradle-plugin")

@@ -130,11 +130,19 @@ export default function HomeScreen() {
     duration: 0,
   });
   const [settings, setSettings] = useState<AppSettings>({
-    resolution: 'device',
+    resolution: '1080p',
     fps: 30,
-    includeAudio: true,
+    audioSource: 'microphone',
+    volume: 100,
+    noiseReduction: false,
+    countdown: '3s',
+    hidePostRecordingPopup: false,
     showTouches: false,
+    shakeToStop: false,
+    shakeSensitivity: 50,
     saveFolder: 'Movies/VelaudRecorder',
+    trashEnabled: true,
+    language: 'system',
   });
 
   const btnScale = useRef(new Animated.Value(1)).current;
@@ -238,7 +246,8 @@ export default function HomeScreen() {
         return;
       }
 
-      if (settings.includeAudio) {
+      const hasAudio = settings.audioSource !== 'none';
+      if (hasAudio) {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
           {
@@ -258,7 +267,8 @@ export default function HomeScreen() {
         width: dims.width || undefined,
         height: dims.height || undefined,
         fps: settings.fps,
-        includeAudio: settings.includeAudio,
+        includeAudio: hasAudio,
+        audioSource: settings.audioSource,
         showTouches: settings.showTouches,
       };
 
@@ -292,9 +302,9 @@ export default function HomeScreen() {
   }, [status.isPaused]);
 
   const toggleAudio = useCallback(async () => {
-    const updated = {...settings, includeAudio: !settings.includeAudio};
-    setSettings(updated);
-    await SettingsManager.save({includeAudio: updated.includeAudio});
+    const next = settings.audioSource === 'none' ? 'microphone' : 'none';
+    setSettings({...settings, audioSource: next});
+    await SettingsManager.save({audioSource: next});
   }, [settings]);
 
   const toggleTouches = useCallback(async () => {
@@ -307,7 +317,8 @@ export default function HomeScreen() {
     navigation.getParent()?.navigate('Ayarlar' as never);
   }, [navigation]);
 
-  const resLabel = settings.resolution === 'device' ? 'Cihaz' : settings.resolution;
+  const resLabel = settings.resolution.toUpperCase();
+  const hasAudio = settings.audioSource !== 'none';
   const {isRecording, isPaused} = status;
 
   const ringColor = isPaused ? Colors.paused : Colors.recording;
@@ -324,7 +335,7 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.headerBrand}>
           <Image
-            source={require('../../android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png')}
+            source={require('../../android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png')}
             style={styles.logoMark}
           />
           <Text style={styles.brandName}>Velaud Recorder</Text>
@@ -350,9 +361,9 @@ export default function HomeScreen() {
         <Chip icon="quality-high" label={resLabel} onPress={goToSettings} />
         <Chip icon="filmstrip" label={`${settings.fps} FPS`} onPress={goToSettings} />
         <Chip
-          icon={settings.includeAudio ? 'microphone' : 'microphone-off'}
-          label={settings.includeAudio ? 'Ses Açık' : 'Sessiz'}
-          active={settings.includeAudio}
+          icon={hasAudio ? 'microphone' : 'microphone-off'}
+          label={hasAudio ? 'Ses Açık' : 'Sessiz'}
+          active={hasAudio}
           onPress={toggleAudio}
         />
         <Chip
@@ -398,8 +409,8 @@ export default function HomeScreen() {
           </View>
         ) : (
           <View style={styles.idleBlock}>
-            <Text style={styles.idleTitle}>Ekranı Kaydet</Text>
-            <Text style={styles.idleSub}>{resLabel} · {settings.fps} FPS · {settings.includeAudio ? 'Sesli' : 'Sessiz'}</Text>
+            <Text style={styles.idleTitle}>Ekran Kaydını Başlat</Text>
+            <Text style={styles.idleSub}>{resLabel} · {settings.fps} FPS · {hasAudio ? 'Sesli' : 'Sessiz'}</Text>
           </View>
         )}
       </View>
@@ -617,14 +628,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   idleTitle: {
-    color: Colors.textSecondary,
-    fontSize: 17,
-    fontWeight: '600',
+    color: Colors.white,
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   idleSub: {
-    color: Colors.textMuted,
-    fontSize: 12,
-    letterSpacing: 0.4,
+    color: Colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
 
   // Bottom area
