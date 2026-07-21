@@ -22,6 +22,7 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Video from 'react-native-video';
 import {Colors} from '../theme/colors';
+import {Fonts} from '../theme/fonts';
 import {VideoEditor, VideoInfo} from '../modules/VideoEditorModule';
 import {RootStackParamList} from '../navigation/AppNavigator';
 
@@ -481,7 +482,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: Colors.border,
   },
-  topTitle: {color: Colors.white, fontSize: 16, fontWeight: '800'},
+  topTitle: {color: Colors.white, fontSize: 15, fontFamily: Fonts.displayBold},
   topRight: {flexDirection: 'row', gap: 6},
   settingsPill: {
     backgroundColor: Colors.surface,
@@ -539,10 +540,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sectionLabel: {
-    color: Colors.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 1.5,
+    color: Colors.textMuted, fontSize: 10, fontFamily: Fonts.monoRegular, letterSpacing: 1.5,
   },
   trimDuration: {
-    color: Colors.primary, fontSize: 13, fontWeight: '700',
+    color: Colors.primary, fontSize: 13, fontFamily: Fonts.mono,
   },
   timelineContainer: {
     position: 'relative', height: 50, justifyContent: 'center',
@@ -587,7 +588,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 4,
   },
-  timeText: {color: Colors.textMuted, fontSize: 10, fontWeight: '600'},
+  timeText: {color: Colors.textMuted, fontSize: 10, fontFamily: Fonts.monoRegular},
 
   // Tools
   toolRow: {
@@ -655,7 +656,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   exportBtnDisabled: {opacity: 0.6},
-  exportBtnText: {color: Colors.white, fontSize: 14, fontWeight: '800'},
+  exportBtnText: {color: Colors.white, fontSize: 14, fontFamily: Fonts.displayBold},
 
   // Modal
   modalBackdrop: {

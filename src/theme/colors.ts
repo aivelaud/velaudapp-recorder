@@ -1,56 +1,63 @@
 /**
- * Velaud Recorder — Design System
- * True-black base, electric blue brand color.
- * BLUE = brand / interactive; RED = recording / destructive only.
+ * Velaud Recorder — "Cine Noir" Design System
+ * Graphite-plum base, cinematic gold brand color, electric teal for live/social.
+ * GOLD = brand / interactive; RED = recording only; TEAL = live / social accents.
  */
 export const Colors = {
-  // Base surfaces — true dark
-  background:        '#080808',
-  surface:          '#111111',
-  surfaceElevated:  '#1A1A1A',
-  surfaceHighlight: '#222222',
-  overlay:          'rgba(0,0,0,0.72)',
+  // Base surfaces — graphite with a warm plum undertone (not pure neutral black)
+  background:        '#0C0A10',
+  surface:            '#171320',
+  surfaceElevated:    '#211B29',
+  surfaceHighlight:   '#2C2436',
+  overlay:            'rgba(8,6,12,0.78)',
 
-  // Brand — electric blue
-  primary:           '#3B82F6',
-  primaryDark:       '#2563EB',
-  primaryLight:      '#60A5FA',
-  primaryMuted:      'rgba(59,130,246,0.12)',
-  primaryGlow:       'rgba(59,130,246,0.25)',
+  // Brand — cinematic gold (aperture / film-reel accent)
+  primary:            '#F5A623',
+  primaryDark:        '#D6890F',
+  primaryLight:       '#FFC65C',
+  primaryMuted:       'rgba(245,166,35,0.14)',
+  primaryGlow:        'rgba(245,166,35,0.30)',
 
-  // Text hierarchy
-  text:              '#FFFFFF',
-  textSecondary:     '#ADADAD',
-  textMuted:         '#5A5A5A',
-  textDisabled:      '#333333',
+  // Secondary — electric teal (live / streaming / social)
+  secondary:          '#2FE6C9',
+  secondaryDark:      '#17BFA6',
+  secondaryLight:     '#7BF3E0',
+  secondaryMuted:     'rgba(47,230,201,0.14)',
+  secondaryGlow:      'rgba(47,230,201,0.30)',
 
-  // Borders (very subtle on dark)
-  border:            '#242424',
-  borderLight:       '#303030',
-  borderFocus:       '#444444',
+  // Text hierarchy — warm-tinted grays to match the plum base
+  text:               '#FDFBFF',
+  textSecondary:      '#C0B6CC',
+  textMuted:          '#736A82',
+  textDisabled:       '#3F3850',
+
+  // Borders (subtle, warm-tinted on dark)
+  border:             '#2A2434',
+  borderLight:        '#392F47',
+  borderFocus:        '#4A3D5C',
 
   // Status
-  success:           '#30D158',
-  successMuted:      'rgba(48,209,88,0.12)',
-  warning:           '#FF9F0A',
-  warningMuted:      'rgba(255,159,10,0.12)',
-  error:             '#FF453A',
-  errorMuted:        'rgba(255,69,58,0.12)',
+  success:            '#33D6A0',
+  successMuted:       'rgba(51,214,160,0.14)',
+  warning:            '#FFB020',
+  warningMuted:       'rgba(255,176,32,0.14)',
+  error:              '#FF4361',
+  errorMuted:         'rgba(255,67,97,0.14)',
 
-  // Recording states — red is universal convention for record
-  recording:         '#FF453A',
-  recordingGlow:     'rgba(255,69,58,0.30)',
-  paused:            '#FF9F0A',
-  pausedGlow:        'rgba(255,159,10,0.25)',
+  // Recording states — red is the universal convention for record
+  recording:          '#FF3B4E',
+  recordingGlow:      'rgba(255,59,78,0.34)',
+  paused:             '#F5A623',
+  pausedGlow:         'rgba(245,166,35,0.28)',
 
   // Utility
-  white:             '#FFFFFF',
-  black:             '#000000',
-  transparent:       'transparent',
+  white:              '#FFFFFF',
+  black:              '#000000',
+  transparent:        'transparent',
 
   // Chip/badge accent
-  chip:              '#1E1E1E',
-  chipBorder:        '#2E2E2E',
-  chipActive:        'rgba(59,130,246,0.10)',
-  chipActiveBorder:  'rgba(59,130,246,0.40)',
+  chip:               '#221C2C',
+  chipBorder:         '#362D44',
+  chipActive:         'rgba(245,166,35,0.12)',
+  chipActiveBorder:   'rgba(245,166,35,0.45)',
 };

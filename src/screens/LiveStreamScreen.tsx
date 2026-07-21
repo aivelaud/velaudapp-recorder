@@ -17,6 +17,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation, useRoute, RouteProp} from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Colors} from '../theme/colors';
+import {Fonts} from '../theme/fonts';
 import {LiveStream, LiveStreamConfig} from '../modules/LiveStreamModule';
 import {LiveChat, ChatPlatform, ChatConfig} from '../modules/LiveChatModule';
 import {RootStackParamList} from '../navigation/AppNavigator';
@@ -390,8 +391,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: Colors.white,
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 17,
+    fontFamily: Fonts.displayBold,
   },
   scroll: {
     flex: 1,
@@ -403,7 +404,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     color: Colors.textMuted,
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: Fonts.monoRegular,
     letterSpacing: 1.2,
     marginTop: 22,
     marginBottom: 8,
@@ -536,8 +537,8 @@ const styles = StyleSheet.create({
   },
   startBtnText: {
     color: Colors.white,
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 16,
+    fontFamily: Fonts.displayBold,
   },
   startingBtn: {
     flexDirection: 'row',
@@ -583,13 +584,13 @@ const styles = StyleSheet.create({
   liveBadgeText: {
     color: Colors.recording,
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: Fonts.mono,
     letterSpacing: 1,
   },
   liveDuration: {
     color: Colors.white,
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: Fonts.monoRegular,
     marginLeft: 4,
   },
   stopBtnSmall: {

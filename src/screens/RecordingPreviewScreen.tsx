@@ -16,6 +16,7 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Video from 'react-native-video';
 import {Colors} from '../theme/colors';
+import {Fonts} from '../theme/fonts';
 import {VideoLibrary} from '../modules/VideoLibraryModule';
 import {RootStackParamList} from '../navigation/AppNavigator';
 
@@ -225,8 +226,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: Colors.white,
-    fontSize: 17,
-    fontWeight: '800',
+    fontSize: 16,
+    fontFamily: Fonts.displayBold,
   },
 
   successStrip: {
@@ -347,6 +348,6 @@ const styles = StyleSheet.create({
   pillLabelPrimary: {
     color: Colors.white,
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: Fonts.displayBold,
   },
 });

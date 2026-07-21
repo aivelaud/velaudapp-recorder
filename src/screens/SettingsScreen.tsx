@@ -14,6 +14,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Slider from '@react-native-community/slider';
 import {Colors} from '../theme/colors';
+import {Fonts} from '../theme/fonts';
 import {
   SettingsManager,
   AppSettings,
@@ -603,9 +604,9 @@ const styles = StyleSheet.create({
 
   pageTitle: {
     color: Colors.white,
-    fontSize: 28,
-    fontWeight: '800',
-    letterSpacing: -0.5,
+    fontSize: 26,
+    fontFamily: Fonts.displayExtraBold,
+    letterSpacing: -0.3,
     marginTop: 8,
     marginBottom: 24,
   },
@@ -638,7 +639,7 @@ const styles = StyleSheet.create({
   sectionHead: {
     color: Colors.textMuted,
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: Fonts.monoRegular,
     letterSpacing: 1.5,
     marginBottom: 8,
     marginTop: 4,
@@ -837,7 +838,7 @@ const styles = StyleSheet.create({
   sigText: {
     color: Colors.textSecondary,
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: Fonts.displayBold,
   },
   sigSub: {
     color: Colors.textMuted,

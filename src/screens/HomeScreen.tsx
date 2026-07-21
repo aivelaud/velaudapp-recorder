@@ -17,6 +17,7 @@ import {useNavigation, useFocusEffect} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Colors} from '../theme/colors';
+import {Fonts} from '../theme/fonts';
 import {
   Recorder,
   FloatingPanel,
@@ -493,9 +494,9 @@ const styles = StyleSheet.create({
   },
   brandName: {
     color: Colors.white,
-    fontSize: 21,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    fontSize: 20,
+    fontFamily: Fonts.displayExtraBold,
+    letterSpacing: -0.2,
   },
   headerActions: {
     flexDirection: 'row',
@@ -625,16 +626,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   timerText: {
-    fontSize: 44,
-    fontWeight: '300',
-    letterSpacing: 3,
+    fontSize: 42,
+    fontFamily: Fonts.mono,
+    letterSpacing: 2,
     fontVariant: ['tabular-nums'],
     color: Colors.white,
   },
   statusLabel: {
     color: Colors.textMuted,
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: Fonts.bodyBold,
     letterSpacing: 2,
   },
   idleBlock: {
@@ -644,14 +645,14 @@ const styles = StyleSheet.create({
   },
   idleTitle: {
     color: Colors.white,
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: 0.3,
+    fontSize: 19,
+    fontFamily: Fonts.displayBold,
+    letterSpacing: 0.2,
   },
   idleSub: {
     color: Colors.textSecondary,
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: Fonts.bodyMedium,
     letterSpacing: 0.5,
   },
 
@@ -698,8 +699,8 @@ const styles = StyleSheet.create({
   ctaIcon: {},
   ctaText: {
     color: Colors.white,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 15,
+    fontFamily: Fonts.displayBold,
     letterSpacing: 0.2,
   },
 });

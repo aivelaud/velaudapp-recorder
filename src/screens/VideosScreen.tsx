@@ -18,6 +18,7 @@ import {useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Colors} from '../theme/colors';
+import {Fonts} from '../theme/fonts';
 import {VideoLibrary, VideoItem} from '../modules/VideoLibraryModule';
 import i18n from '../modules/i18n';
 import {Recorder} from '../modules/RecorderModule';
@@ -286,17 +287,17 @@ const styles = StyleSheet.create({
   },
   pageTitle: {
     color: Colors.white,
-    fontSize: 28,
-    fontWeight: '800',
-    letterSpacing: -0.5,
+    fontSize: 26,
+    fontFamily: Fonts.displayExtraBold,
+    letterSpacing: -0.3,
   },
   countBadge: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.secondary,
     borderRadius: 10,
     paddingHorizontal: 9,
     paddingVertical: 3,
   },
-  countText: {color: Colors.white, fontSize: 12, fontWeight: '800'},
+  countText: {color: Colors.background, fontSize: 12, fontFamily: Fonts.bodyBold},
 
   row: {gap: 10, paddingHorizontal: 20},
   listContent: {paddingBottom: 24, gap: 10},
@@ -382,8 +383,8 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     color: Colors.white,
-    fontSize: 19,
-    fontWeight: '800',
+    fontSize: 18,
+    fontFamily: Fonts.displayBold,
   },
   emptySub: {
     color: Colors.textMuted,

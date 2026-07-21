@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#3B82F6</color>
-    <color name="primaryDark">#2563EB</color>
-    <color name="accent">#60A5FA</color>
-    <color name="background">#080808</color>
-    <color name="surface">#111111</color>
+    <color name="primary">#F5A623</color>
+    <color name="primaryDark">#D6890F</color>
+    <color name="accent">#2FE6C9</color>
+    <color name="background">#0C0A10</color>
+    <color name="surface">#171320</color>
     <color name="white">#FFFFFF</color>
     <color name="black">#000000</color>
-    <color name="splash_background">#080808</color>
+    <color name="splash_background">#0C0A10</color>
+    <color name="splash_ring">#221C2C</color>
 </resources>

@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Colors} from '../theme/colors';
+import {Fonts} from '../theme/fonts';
 import {LiveChat, ChatConfig, ChatMessage} from '../modules/LiveChatModule';
 
 const {width: SCREEN_W, height: SCREEN_H} = Dimensions.get('window');
@@ -122,7 +123,7 @@ export default function FloatingChatPanel({config}: {config: ChatConfig}) {
         <TouchableOpacity
           style={styles.collapsedBubble}
           onPress={() => setIsExpanded(true)}>
-          <Icon name="chat" size={22} color={Colors.primary} />
+          <Icon name="chat" size={22} color={Colors.secondary} />
           {messages.length > 0 && (
             <View style={styles.unreadBadge}>
               <Text style={styles.unreadText}>{messages.length}</Text>
@@ -248,11 +249,11 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     backgroundColor: Colors.surface,
     borderWidth: 1.5,
-    borderColor: Colors.primary,
+    borderColor: Colors.secondary,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 10,
-    shadowColor: Colors.primary,
+    shadowColor: Colors.secondary,
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -305,15 +306,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: Colors.secondaryMuted,
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   viewerCountText: {
-    color: Colors.primary,
+    color: Colors.secondary,
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: Fonts.mono,
   },
   chatStatus: {
     flexDirection: 'row',
