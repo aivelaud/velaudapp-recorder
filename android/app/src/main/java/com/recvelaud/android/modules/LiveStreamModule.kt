@@ -516,7 +516,7 @@ class LiveStreamModule(private val reactContext: ReactApplicationContext) :
 
     private fun stripAdts(data: ByteArray): ByteArray {
         // ADTS header is 7 bytes (or 9 with CRC). Check for sync word 0xFFF
-        if (data.size > 2 && data[0].toInt() == 0xFF.toByte() &&
+        if (data.size > 2 && (data[0].toInt() and 0xFF) == 0xFF &&
             (data[1].toInt() and 0xF0) == 0xF0) {
             val headerLen = if ((data[1].toInt() and 0x01) == 0) 7 else 9
             return if (data.size > headerLen) data.sliceArray(headerLen until data.size) else data

@@ -423,9 +423,8 @@ class LiveChatModule(private val reactContext: ReactApplicationContext) :
             if (conn.responseCode == 200) {
                 val resp = BufferedReader(InputStreamReader(conn.inputStream)).readText()
                 conn.disconnect()
-                JSONObject(resp).optInt("livestream", JSONObject())?.let {
-                    it.optInt("viewer_count")
-                } ?: 0
+                val json = JSONObject(resp)
+                json.optJSONObject("livestream")?.optInt("viewer_count") ?: 0
             } else {
                 conn.disconnect()
                 0
