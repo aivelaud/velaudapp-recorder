@@ -71,13 +71,15 @@ export const SettingsManager = {
   },
 
   getResolutionDimensions(resolution: ResolutionOption): {width: number; height: number} {
+    // Portrait (9:16) dimensions — screen recordings on mobile should be
+    // portrait, matching the device orientation most users record in.
     switch (resolution) {
-      case '144p': return {width: 256, height: 144};
-      case '240p': return {width: 426, height: 240};
-      case '360p': return {width: 640, height: 360};
-      case '480p': return {width: 854, height: 480};
-      case '720p': return {width: 1280, height: 720};
-      case '1080p': return {width: 1920, height: 1080};
+      case '144p': return {width: 144, height: 256};
+      case '240p': return {width: 240, height: 426};
+      case '360p': return {width: 360, height: 640};
+      case '480p': return {width: 480, height: 854};
+      case '720p': return {width: 720, height: 1280};
+      case '1080p': return {width: 1080, height: 1920};
       default: return {width: 0, height: 0};
     }
   },

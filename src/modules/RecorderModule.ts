@@ -11,6 +11,12 @@ export interface RecordingConfig {
   showTouches?: boolean;
   includeAudio?: boolean;
   audioSource?: string;
+  volume?: number;
+  noiseReduction?: boolean;
+  countdown?: string;
+  hidePostRecordingPopup?: boolean;
+  shakeToStop?: boolean;
+  shakeSensitivity?: number;
 }
 
 export interface RecordingStatus {

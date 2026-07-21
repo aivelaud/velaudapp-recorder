@@ -107,14 +107,26 @@ function LivePlatformButton({
   platform: {key: ChatPlatform; label: string; icon: string; color: string};
   onPress: () => void;
 }) {
+  const scale = useRef(new Animated.Value(1)).current;
   return (
-    <TouchableOpacity
-      style={styles.liveChip}
-      onPress={onPress}
-      activeOpacity={0.7}>
-      <Icon name={platform.icon} size={16} color={platform.color} />
-      <Text style={styles.liveChipText}>{platform.label}</Text>
-    </TouchableOpacity>
+    <Animated.View style={{transform: [{scale}]}}>
+      <TouchableOpacity
+        style={[styles.liveChip, {borderColor: platform.color + '55'}]}
+        onPress={onPress}
+        onPressIn={() =>
+          Animated.spring(scale, {toValue: 0.94, useNativeDriver: true}).start()
+        }
+        onPressOut={() =>
+          Animated.spring(scale, {toValue: 1, friction: 3, useNativeDriver: true}).start()
+        }
+        activeOpacity={0.85}>
+        <View style={[styles.liveChipIcon, {backgroundColor: platform.color + '22'}]}>
+          <Icon name={platform.icon} size={18} color={platform.color} />
+        </View>
+        <Text style={styles.liveChipText}>{platform.label}</Text>
+        <View style={[styles.liveChipDot, {backgroundColor: platform.color}]} />
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -270,6 +282,12 @@ export default function HomeScreen() {
         includeAudio: hasAudio,
         audioSource: settings.audioSource,
         showTouches: settings.showTouches,
+        countdown: settings.countdown,
+        hidePostRecordingPopup: settings.hidePostRecordingPopup,
+        shakeToStop: settings.shakeToStop,
+        shakeSensitivity: settings.shakeSensitivity,
+        volume: settings.volume,
+        noiseReduction: settings.noiseReduction,
       };
 
       const started = await Recorder.startRecording(config);
@@ -522,18 +540,37 @@ const styles = StyleSheet.create({
   liveChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    backgroundColor: Colors.chip,
-    borderRadius: 20,
+    gap: 8,
+    backgroundColor: Colors.surface,
+    borderRadius: 22,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: Colors.chipBorder,
+    paddingVertical: 9,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+  },
+  liveChipIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   liveChipText: {
-    color: Colors.textSecondary,
-    fontSize: 12,
+    color: Colors.white,
+    fontSize: 12.5,
     fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  liveChipDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    marginLeft: 2,
   },
 
   // Center

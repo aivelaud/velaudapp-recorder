@@ -68,6 +68,13 @@
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
 
+        <!-- Live Stream Foreground Service -->
+        <service
+            android:name=".services.LiveStreamService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
+
         <!-- FileProvider for sharing/editing videos from overlay -->
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -14,6 +14,7 @@ import android.os.Looper
 import android.util.Log
 import com.facebook.react.bridge.*
 import com.facebook.react.modules.core.DeviceEventManagerModule
+import com.recvelaud.android.services.LiveStreamService
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -125,6 +126,18 @@ class LiveStreamModule(private val reactContext: ReactApplicationContext) :
                             emitError("RTMP connection failed")
                         }
                         return@Thread
+                    }
+
+                    // CRITICAL FIX: Start foreground service BEFORE getMediaProjection().
+                    // Android 14+ (API 34) requires an active foreground service of type
+                    // mediaProjection before MediaProjection can be created, otherwise
+                    // SecurityException is thrown ("Media projections require a foreground
+                    // service of type mediaProjection").
+                    val fgIntent = Intent(reactContext, LiveStreamService::class.java)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        reactContext.startForegroundService(fgIntent)
+                    } else {
+                        reactContext.startService(fgIntent)
                     }
 
                     // Set up MediaProjection
@@ -547,6 +560,13 @@ class LiveStreamModule(private val reactContext: ReactApplicationContext) :
         mediaProjection = null
         rtmpClient?.close()
         rtmpClient = null
+        // Stop the foreground service
+        try {
+            val stopIntent = Intent(reactContext, LiveStreamService::class.java).apply {
+                action = LiveStreamService.ACTION_STOP
+            }
+            reactContext.startService(stopIntent)
+        } catch (_: Exception) {}
         emitStatus()
         Log.i(TAG, "Streaming stopped")
     }

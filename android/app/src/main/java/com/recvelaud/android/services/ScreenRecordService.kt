@@ -9,6 +9,10 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.MediaRecorder
@@ -54,6 +58,10 @@ class ScreenRecordService : Service() {
         const val EXTRA_AUDIO_SOURCE = "audio_source"
         const val EXTRA_VOLUME = "volume"
         const val EXTRA_NOISE_REDUCTION = "noise_reduction"
+        const val EXTRA_COUNTDOWN = "countdown"
+        const val EXTRA_HIDE_POPUP = "hide_popup"
+        const val EXTRA_SHAKE_TO_STOP = "shake_to_stop"
+        const val EXTRA_SHAKE_SENSITIVITY = "shake_sensitivity"
 
         var reactContext: ReactApplicationContext? = null
     }
@@ -79,6 +87,9 @@ class ScreenRecordService : Service() {
     private var durationTimer: Timer? = null
     private val handler = Handler(Looper.getMainLooper())
     private var projectionCallback: MediaProjection.Callback? = null
+    private var sensorManager: SensorManager? = null
+    private var shakeListener: SensorEventListener? = null
+    private var lastShakeMs = 0L
 
     override fun onBind(intent: Intent?): IBinder = binder
 
@@ -153,6 +164,10 @@ class ScreenRecordService : Service() {
         val audioSourceStr = intent.getStringExtra(EXTRA_AUDIO_SOURCE) ?: "microphone"
         val volume = intent.getIntExtra(EXTRA_VOLUME, 100)
         val noiseReduction = intent.getBooleanExtra(EXTRA_NOISE_REDUCTION, false)
+        val countdownStr = intent.getStringExtra(EXTRA_COUNTDOWN) ?: "3s"
+        val hidePopup = intent.getBooleanExtra(EXTRA_HIDE_POPUP, false)
+        val shakeToStop = intent.getBooleanExtra(EXTRA_SHAKE_TO_STOP, false)
+        val shakeSensitivity = intent.getIntExtra(EXTRA_SHAKE_SENSITIVITY, 50)
 
         if (resultCode != android.app.Activity.RESULT_OK) {
             Log.e(TAG, "Invalid result code for MediaProjection: $resultCode")
@@ -306,10 +321,19 @@ class ScreenRecordService : Service() {
                 throw Exception("VirtualDisplay oluşturulamadı")
             }
 
-            // ── 3-second countdown overlay before recording starts ─────────
-            // Shows a blue (app brand color) full-screen countdown 3→2→1,
-            // then begins the actual recording.
-            showCountdownOverlay {
+            // ── Countdown overlay before recording starts ───────────────────
+            // Honors the user's countdown setting (off / 3s / 5s / 10s).
+            // Numbers are white with a soft glow for readability on any content.
+            val countdownSeconds = when (countdownStr) {
+                "off" -> 0
+                "5s" -> 5
+                "10s" -> 10
+                else -> 3
+            }
+            val onHidePopup = hidePopup
+            val onShakeToStop = shakeToStop
+            val onShakeSens = shakeSensitivity
+            showCountdownOverlay(countdownSeconds) {
                 Log.d(TAG, "Calling start()…")
                 mediaRecorder?.start()
                 Log.i(TAG, "Recording started successfully → $outputFilePath")
@@ -321,6 +345,7 @@ class ScreenRecordService : Service() {
 
                 updateNotification("⏺ Ekran kaydediliyor…")
                 startDurationTimer()
+                if (onShakeToStop) startShakeDetection(onShakeSens)
                 emitStatus()
             }
 
@@ -357,6 +382,7 @@ class ScreenRecordService : Service() {
 
     fun stopRecording() {
         if (!isRecording) return
+        stopShakeDetection()
         try {
             durationTimer?.cancel()
             durationTimer = null
@@ -402,16 +428,19 @@ class ScreenRecordService : Service() {
             Log.i(TAG, "Recording stopped, saved: $outputFilePath")
 
             // Show native preview overlay on top of any app (XRecorder-style)
-            try {
-                val ctx = reactContext
-                val path = outputFilePath
-                if (ctx != null && path != null) {
-                    val module = ctx.getNativeModule(
-                        com.recvelaud.android.modules.PreviewOverlayModule::class.java
-                    )
-                    module?.showPreviewDirect(path)
-                }
-            } catch (_: Exception) {}
+            // unless the user has disabled it in Settings.
+            if (!hidePopup) {
+                try {
+                    val ctx = reactContext
+                    val path = outputFilePath
+                    if (ctx != null && path != null) {
+                        val module = ctx.getNativeModule(
+                            com.recvelaud.android.modules.PreviewOverlayModule::class.java
+                        )
+                        module?.showPreviewDirect(path)
+                    }
+                } catch (_: Exception) {}
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping recording: ${e::class.simpleName}: ${e.message}", e)
             emitError("Kayıt durdurulamadı: ${e.message ?: e::class.simpleName}")
@@ -470,7 +499,8 @@ class ScreenRecordService : Service() {
     }
 
     // ── 3-second blue countdown overlay (3 → 2 → 1) before recording starts ─
-    private fun showCountdownOverlay(onComplete: () -> Unit) {
+    private fun showCountdownOverlay(seconds: Int, onComplete: () -> Unit) {
+        if (seconds <= 0) { onComplete(); return }
         val ctx = reactContext ?: run { onComplete(); return }
         val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
         if (wm == null || !Settings.canDrawOverlays(ctx)) {
@@ -482,22 +512,23 @@ class ScreenRecordService : Service() {
         fun dp(v: Int) = (v * density).toInt()
 
         val container = android.widget.FrameLayout(ctx).apply {
-            setBackgroundColor(android.graphics.Color.TRANSPARENT) // no background, only the number
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
         }
 
         val numberView = android.widget.TextView(ctx).apply {
-            text = "3"
-            setTextColor(0xFF3B82F6.toInt()) // blue number, no background
+            text = seconds.toString()
+            setTextColor(android.graphics.Color.WHITE) // white number — readable on any content
             textSize = 140f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = android.view.Gravity.CENTER
-            setShadowLayer(24f, 0f, 0f, 0xFF3B82F6.toInt()) // glow so it's visible on any content
+            setShadowLayer(30f, 0f, 0f, 0xCC000000.toInt()) // soft dark glow for contrast
         }
         val labelView = android.widget.TextView(ctx).apply {
             text = "Kayıt başlıyor…"
-            setTextColor(0xFFCCCCCC.toInt())
+            setTextColor(0xFFE5E7EB.toInt())
             textSize = 16f
             gravity = android.view.Gravity.CENTER
+            setShadowLayer(12f, 0f, 0f, 0xAA000000.toInt())
         }
 
         val textCol = android.widget.LinearLayout(ctx).apply {
@@ -533,7 +564,7 @@ class ScreenRecordService : Service() {
             return
         }
 
-        var count = 3
+        var count = seconds
         val countdownHandler = Handler(Looper.getMainLooper())
         val tick = object : Runnable {
             override fun run() {
@@ -551,10 +582,41 @@ class ScreenRecordService : Service() {
             }
         }
 
-        // Initial scale-in animation for "3"
+        // Initial scale-in animation for the first number
         numberView.scaleX = 0.5f; numberView.scaleY = 0.5f
         numberView.animate().scaleX(1f).scaleY(1f).setDuration(400).start()
         countdownHandler.postDelayed(tick, 1000L)
+    }
+
+    private fun startShakeDetection(sensitivity: Int) {
+        val ctx = reactContext ?: return
+        val sm = ctx.getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        val accel = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) ?: return
+        // Map 10–100 setting → threshold. Higher sensitivity → lower threshold.
+        val threshold = (26f - (sensitivity.coerceIn(10, 100) / 100f) * 20f).coerceAtLeast(6f)
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                if (!isRecording || isPaused) return
+                val x = event.values[0]; val y = event.values[1]; val z = event.values[2]
+                val gForce = Math.sqrt((x*x + y*y + z*z).toDouble()).toFloat()
+                val now = System.currentTimeMillis()
+                if (gForce > threshold && now - lastShakeMs > 1500L) {
+                    lastShakeMs = now
+                    Log.i(TAG, "Shake detected (gForce=%.1f, thr=%.1f) → stopping".format(gForce, threshold))
+                    stopRecording()
+                }
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+        sm.registerListener(listener, accel, SensorManager.SENSOR_DELAY_GAME)
+        sensorManager = sm
+        shakeListener = listener
+    }
+
+    private fun stopShakeDetection() {
+        try { shakeListener?.let { sensorManager?.unregisterListener(it) } } catch (_: Exception) {}
+        shakeListener = null
+        sensorManager = null
     }
 
     private fun updateNotificationWithDuration() {

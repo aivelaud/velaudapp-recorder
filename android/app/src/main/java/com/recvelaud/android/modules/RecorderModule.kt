@@ -92,6 +92,10 @@ class RecorderModule(private val reactContext: ReactApplicationContext) :
             val audioSource = if (config?.hasKey("audioSource") == true) config.getString("audioSource") else "microphone"
             val volume = if (config?.hasKey("volume") == true) config.getInt("volume") else 100
             val noiseReduction = if (config?.hasKey("noiseReduction") == true) config.getBoolean("noiseReduction") else false
+            val countdown = if (config?.hasKey("countdown") == true) config.getString("countdown") else "3s"
+            val hidePopup = if (config?.hasKey("hidePostRecordingPopup") == true) config.getBoolean("hidePostRecordingPopup") else false
+            val shakeToStop = if (config?.hasKey("shakeToStop") == true) config.getBoolean("shakeToStop") else false
+            val shakeSensitivity = if (config?.hasKey("shakeSensitivity") == true) config.getInt("shakeSensitivity") else 50
 
             val intent = Intent(reactApplicationContext, ScreenRecordService::class.java).apply {
                 putExtra(ScreenRecordService.EXTRA_RESULT_CODE, resultCode)
@@ -103,6 +107,10 @@ class RecorderModule(private val reactContext: ReactApplicationContext) :
                 putExtra(ScreenRecordService.EXTRA_AUDIO_SOURCE, audioSource)
                 putExtra(ScreenRecordService.EXTRA_VOLUME, volume)
                 putExtra(ScreenRecordService.EXTRA_NOISE_REDUCTION, noiseReduction)
+                putExtra(ScreenRecordService.EXTRA_COUNTDOWN, countdown)
+                putExtra(ScreenRecordService.EXTRA_HIDE_POPUP, hidePopup)
+                putExtra(ScreenRecordService.EXTRA_SHAKE_TO_STOP, shakeToStop)
+                putExtra(ScreenRecordService.EXTRA_SHAKE_SENSITIVITY, shakeSensitivity)
             }
 
             // CRITICAL: Use startForegroundService on Android O+ to ensure the
