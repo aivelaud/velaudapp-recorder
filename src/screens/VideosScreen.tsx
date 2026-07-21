@@ -19,6 +19,7 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Colors} from '../theme/colors';
 import {VideoLibrary, VideoItem} from '../modules/VideoLibraryModule';
+import i18n from '../modules/i18n';
 import {Recorder} from '../modules/RecorderModule';
 import {RootStackParamList} from '../navigation/AppNavigator';
 
@@ -154,20 +155,28 @@ export default function VideosScreen() {
 
   const handleDelete = useCallback((item: VideoItem) => {
     Alert.alert(
-      'Videoyu Sil',
-      `"${item.displayName}" kalıcı olarak silinecek.`,
+      i18n.lang === 'tr' ? 'Videoyu Sil' : 'Delete Video',
+      i18n.lang === 'tr'
+        ? `"${item.displayName}" kalıcı olarak silinecek.`
+        : `"${item.displayName}" will be permanently deleted.`,
       [
-        {text: 'Vazgeç', style: 'cancel'},
+        {text: i18n.t('home.overlayCancel'), style: 'cancel'},
         {
-          text: 'Sil',
+          text: i18n.lang === 'tr' ? 'Sil' : 'Delete',
           style: 'destructive',
           onPress: async () => {
             const ok = await VideoLibrary.deleteVideo(item.filePath);
             if (ok) {
               setVideos(prev => prev.filter(v => v.id !== item.id));
-              ToastAndroid.show('Video silindi', ToastAndroid.SHORT);
+              ToastAndroid.show(
+                i18n.lang === 'tr' ? 'Video silindi' : 'Video deleted',
+                ToastAndroid.SHORT,
+              );
             } else {
-              Alert.alert('Hata', 'Video silinemedi.');
+              Alert.alert(
+                i18n.t('home.error'),
+                i18n.lang === 'tr' ? 'Video silinemedi.' : 'Could not delete video.',
+              );
             }
           },
         },
@@ -193,7 +202,7 @@ export default function VideosScreen() {
     return (
       <View style={styles.loadingWrap}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Yükleniyor…</Text>
+        <Text style={styles.loadingText}>{i18n.lang === 'tr' ? 'Yükleniyor…' : 'Loading…'}</Text>
       </View>
     );
   }
@@ -202,7 +211,7 @@ export default function VideosScreen() {
     <SafeAreaView style={styles.root} edges={['top']}>
       {/* Page header */}
       <View style={styles.header}>
-        <Text style={styles.pageTitle}>Videolar</Text>
+        <Text style={styles.pageTitle}>{i18n.lang === 'tr' ? 'Videolar' : 'Videos'}</Text>
         {videos.length > 0 && (
           <View style={styles.countBadge}>
             <Text style={styles.countText}>{videos.length}</Text>
@@ -240,9 +249,11 @@ export default function VideosScreen() {
             <View style={styles.emptyIcon}>
               <Icon name="video-off-outline" size={36} color={Colors.textMuted} />
             </View>
-            <Text style={styles.emptyTitle}>Henüz video yok</Text>
+            <Text style={styles.emptyTitle}>{i18n.lang === 'tr' ? 'Henüz video yok' : 'No videos yet'}</Text>
             <Text style={styles.emptySub}>
-              Kayıt sekmesine geç ve ilk ekran kaydını yap.
+              {i18n.lang === 'tr'
+                ? 'Kayıt sekmesine geç ve ilk ekran kaydını yap.'
+                : 'Go to the Record tab and make your first screen recording.'}
             </Text>
           </View>
         }

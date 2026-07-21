@@ -25,6 +25,7 @@ import {
   RecordingConfig,
 } from '../modules/RecorderModule';
 import {SettingsManager, AppSettings} from '../modules/SettingsManager';
+import i18n from '../modules/i18n';
 import {RootStackParamList} from '../navigation/AppNavigator';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
@@ -150,7 +151,10 @@ export default function HomeScreen() {
   const breatheLoop = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
-    SettingsManager.load().then(setSettings);
+    SettingsManager.load().then(s => {
+      setSettings(s);
+      i18n.init(s.language);
+    });
   }, []);
 
   // Reload settings when returning from Settings screen (fixes FPS/resolution sync)
@@ -169,12 +173,12 @@ export default function HomeScreen() {
           navigation.navigate('RecordingPreview', {filePath});
         });
       } else {
-        ToastAndroid.show('Kayıt tamamlandı', ToastAndroid.SHORT);
+        ToastAndroid.show(i18n.t('home.saved'), ToastAndroid.SHORT);
       }
     });
 
     const errorSub = Recorder.onRecordingError((err: string) => {
-      Alert.alert('Kayıt Hatası', err, [{text: 'Tamam'}]);
+      Alert.alert(i18n.t('home.recError'), err, [{text: 'OK'}]);
     });
 
     return () => {
@@ -233,14 +237,14 @@ export default function HomeScreen() {
       const overlayOk = await FloatingPanel.checkOverlayPermission();
       if (!overlayOk) {
         Alert.alert(
-          'Ekran Üstü İzni',
-          'Kayıt sırasında kayan kontrol paneli için "Diğer uygulamaların üzerinde göster" iznini verin.',
+          i18n.t('home.overlayTitle'),
+          i18n.t('home.overlayMsg'),
           [
             {
-              text: 'Ayarlara Git',
+              text: i18n.t('home.overlayGoSettings'),
               onPress: () => FloatingPanel.requestOverlayPermission(),
             },
-            {text: 'Vazgeç', style: 'cancel'},
+            {text: i18n.t('home.overlayCancel'), style: 'cancel'},
           ],
         );
         return;
@@ -251,14 +255,14 @@ export default function HomeScreen() {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
           {
-            title: 'Mikrofon İzni',
-            message: 'Ses kaydı için mikrofon gerekli.',
-            buttonPositive: 'Ver',
-            buttonNegative: 'Reddet',
+            title: i18n.t('home.audioPermissionTitle'),
+            message: i18n.t('home.audioPermissionMsg'),
+            buttonPositive: i18n.t('home.audioPermissionGrant'),
+            buttonNegative: i18n.t('home.audioPermissionDeny'),
           },
         );
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          ToastAndroid.show('Ses devre dışı bırakıldı', ToastAndroid.SHORT);
+          ToastAndroid.show(i18n.t('home.audioDisabled'), ToastAndroid.SHORT);
         }
       }
 
@@ -274,13 +278,13 @@ export default function HomeScreen() {
 
       const started = await Recorder.startRecording(config);
       if (!started) {
-        Alert.alert('Başlatılamadı', 'Ekran kaydı izni reddedildi.');
+        Alert.alert(i18n.t('home.startFailed'), i18n.t('home.startFailedMsg'));
         return;
       }
 
       FloatingPanel.showPanel().catch(() => {});
     } catch (e: any) {
-      Alert.alert('Hata', e?.message ?? 'Bilinmeyen bir hata oluştu.');
+      Alert.alert(i18n.t('home.error'), e?.message ?? i18n.t('home.unknownError'));
     }
   };
 
@@ -338,14 +342,14 @@ export default function HomeScreen() {
             source={require('../../android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png')}
             style={styles.logoMark}
           />
-          <Text style={styles.brandName}>Velaud Recorder</Text>
+          <Text style={styles.brandName}>{i18n.t('home.brand')}</Text>
         </View>
         <View style={styles.headerActions}>
           {isRecording && (
             <View style={styles.recBadge}>
               <View style={[styles.recDot, isPaused && {backgroundColor: Colors.paused}]} />
               <Text style={[styles.recBadgeText, isPaused && {color: Colors.paused}]}>
-                {isPaused ? 'DURAKLATILDI' : 'CANLI'}
+                {isPaused ? i18n.t('home.paused') : i18n.t('home.live')}
               </Text>
             </View>
           )}
@@ -362,13 +366,13 @@ export default function HomeScreen() {
         <Chip icon="filmstrip" label={`${settings.fps} FPS`} onPress={goToSettings} />
         <Chip
           icon={hasAudio ? 'microphone' : 'microphone-off'}
-          label={hasAudio ? 'Ses Açık' : 'Sessiz'}
+          label={hasAudio ? i18n.t('home.audioOn') : i18n.t('home.audioOff')}
           active={hasAudio}
           onPress={toggleAudio}
         />
         <Chip
           icon="gesture-tap"
-          label="Dokunma"
+          label={i18n.t('home.touches')}
           active={settings.showTouches}
           onPress={toggleTouches}
         />
@@ -404,13 +408,13 @@ export default function HomeScreen() {
               {fmtDuration(status.duration)}
             </Text>
             <Text style={styles.statusLabel}>
-              {isPaused ? 'DURAKLATILDI' : 'KAYIT YAPILIYOR'}
+              {isPaused ? i18n.t('home.paused') : i18n.t('home.recording')}
             </Text>
           </View>
         ) : (
           <View style={styles.idleBlock}>
-            <Text style={styles.idleTitle}>Ekran Kaydını Başlat</Text>
-            <Text style={styles.idleSub}>{resLabel} · {settings.fps} FPS · {hasAudio ? 'Sesli' : 'Sessiz'}</Text>
+            <Text style={styles.idleTitle}>{i18n.t('home.startRecording')}</Text>
+            <Text style={styles.idleSub}>{resLabel} · {settings.fps} FPS · {hasAudio ? i18n.t('home.audioOnShort') : i18n.t('home.audioOffShort')}</Text>
           </View>
         )}
       </View>
@@ -428,7 +432,7 @@ export default function HomeScreen() {
               color={isPaused ? Colors.success : Colors.textSecondary}
             />
             <Text style={[styles.pauseRowText, isPaused && {color: Colors.success}]}>
-              {isPaused ? 'Devam Et' : 'Duraklat'}
+              {isPaused ? i18n.t('home.resume') : i18n.t('home.pause')}
             </Text>
           </TouchableOpacity>
         )}
@@ -450,7 +454,7 @@ export default function HomeScreen() {
               style={styles.ctaIcon}
             />
             <Text style={styles.ctaText}>
-              {isRecording ? 'Kaydı Durdur' : 'Kaydı Başlat'}
+              {isRecording ? i18n.t('home.stopButton') : i18n.t('home.startButton')}
             </Text>
           </TouchableOpacity>
         </Animated.View>

@@ -88,10 +88,10 @@ class RecorderModule(private val reactContext: ReactApplicationContext) :
             val height = if (config?.hasKey("height") == true && config.getInt("height") > 0)
                 config.getInt("height") else metrics.heightPixels
             val fps = if (config?.hasKey("fps") == true) config.getInt("fps") else 30
-            val includeAudio = config?.getBoolean("includeAudio") ?: true
-            val audioSource = config?.getString("audioSource") ?: "microphone"
+            val includeAudio = if (config?.hasKey("includeAudio") == true) config.getBoolean("includeAudio") else true
+            val audioSource = if (config?.hasKey("audioSource") == true) config.getString("audioSource") else "microphone"
             val volume = if (config?.hasKey("volume") == true) config.getInt("volume") else 100
-            val noiseReduction = config?.getBoolean("noiseReduction") ?: false
+            val noiseReduction = if (config?.hasKey("noiseReduction") == true) config.getBoolean("noiseReduction") else false
 
             val intent = Intent(reactApplicationContext, ScreenRecordService::class.java).apply {
                 putExtra(ScreenRecordService.EXTRA_RESULT_CODE, resultCode)

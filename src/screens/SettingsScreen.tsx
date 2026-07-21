@@ -24,6 +24,7 @@ import {
   LanguageOption,
 } from '../modules/SettingsManager';
 import {Recorder} from '../modules/RecorderModule';
+import i18n from '../modules/i18n';
 
 type SectionName = 'main' | 'audio';
 
@@ -159,7 +160,7 @@ function PickerModal<T extends string | number>({
           );
         })}
         <TouchableOpacity style={styles.modalCancel} onPress={onClose} activeOpacity={0.7}>
-          <Text style={styles.modalCancelText}>Vazgeç</Text>
+          <Text style={styles.modalCancelText}>{i18n.t('home.overlayCancel')}</Text>
         </TouchableOpacity>
       </View>
     </Modal>
@@ -175,10 +176,10 @@ function AudioSourceBubbles({
   onSelect: (v: AudioSource) => void;
 }) {
   const sources: {key: AudioSource; icon: string; label: string}[] = [
-    {key: 'microphone', icon: 'microphone', label: 'Mikrofon'},
-    {key: 'internal', icon: 'volume-high', label: 'Dahili Ses'},
-    {key: 'both', icon: 'microphone-plus', label: 'Dahili + Mikrofon'},
-    {key: 'none', icon: 'volume-off', label: 'Sessiz'},
+    {key: 'microphone', icon: 'microphone', label: i18n.t('settings.mic')},
+    {key: 'internal', icon: 'volume-high', label: i18n.t('settings.internal')},
+    {key: 'both', icon: 'microphone-plus', label: i18n.t('settings.both')},
+    {key: 'none', icon: 'volume-off', label: i18n.t('settings.silent')},
   ];
   return (
     <View style={styles.bubbleRow}>
@@ -229,13 +230,18 @@ export default function SettingsScreen() {
   const [showFpsModal, setShowFpsModal] = useState(false);
   const [showCountdownModal, setShowCountdownModal] = useState(false);
   const [showLangModal, setShowLangModal] = useState(false);
+  const [, setLangTick] = useState(0);
   const [deviceCaps, setDeviceCaps] = useState<{maxResolution: string; maxFps: number}>({
     maxResolution: '1080p',
     maxFps: 120,
   });
 
   useEffect(() => {
-    SettingsManager.load().then(setSettings);
+    SettingsManager.load().then(s => {
+      setSettings(s);
+      i18n.init(s.language);
+      setLangTick(t => t + 1);
+    });
     Recorder.getDeviceCapabilities().then(setDeviceCaps).catch(() => {});
   }, []);
 
@@ -243,6 +249,10 @@ export default function SettingsScreen() {
     setSettings((prev) => {
       const next = {...prev, ...patch};
       SettingsManager.save(patch);
+      if (patch.language) {
+        i18n.init(patch.language);
+        setLangTick(t => t + 1);
+      }
       return next;
     });
   }, []);
@@ -304,23 +314,23 @@ export default function SettingsScreen() {
   }, [deviceCaps]);
 
   const countdownOptions: {label: string; desc?: string; value: CountdownOption}[] = [
-    {label: 'Kapalı', desc: 'Geri sayım gösterme', value: 'off'},
-    {label: '3 saniye', value: '3s'},
-    {label: '5 saniye', value: '5s'},
-    {label: '10 saniye', value: '10s'},
+    {label: i18n.t('settings.countdownOff'), value: 'off'},
+    {label: '3 ' + (i18n.lang === 'tr' ? 'saniye' : 'seconds'), value: '3s'},
+    {label: '5 ' + (i18n.lang === 'tr' ? 'saniye' : 'seconds'), value: '5s'},
+    {label: '10 ' + (i18n.lang === 'tr' ? 'saniye' : 'seconds'), value: '10s'},
   ];
 
   const langOptions: {label: string; desc?: string; value: LanguageOption}[] = [
-    {label: 'Sistem Varsayılanı', value: 'system'},
-    {label: 'Türkçe', value: 'tr'},
-    {label: 'English', value: 'en'},
+    {label: i18n.t('settings.langSystem'), value: 'system'},
+    {label: i18n.t('settings.langTurkish'), value: 'tr'},
+    {label: i18n.t('settings.langEnglish'), value: 'en'},
   ];
 
   const audioSourceLabel: Record<AudioSource, string> = {
-    microphone: 'Mikrofon',
-    internal: 'Dahili Ses',
-    both: 'Dahili + Mikrofon',
-    none: 'Sessiz',
+    microphone: i18n.t('settings.mic'),
+    internal: i18n.t('settings.internal'),
+    both: i18n.t('settings.both'),
+    none: i18n.t('settings.silent'),
   };
 
   // ── Audio sub-page ──────────────────────────────────────────────────────
@@ -333,12 +343,12 @@ export default function SettingsScreen() {
             onPress={() => setSection('main')}>
             <Icon name="arrow-left" size={20} color={Colors.white} />
           </TouchableOpacity>
-          <Text style={styles.subTitle}>Ses Ayarları</Text>
+          <Text style={styles.subTitle}>{i18n.t('settings.audio')}</Text>
           <View style={{width: 40}} />
         </View>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
           {/* Audio source bubbles */}
-          <SectionHead title="SES KAYNAĞI" />
+          <SectionHead title={i18n.t('settings.audioSource').toUpperCase()} />
           <Section>
             <View style={styles.bubbleSection}>
               <AudioSourceBubbles
@@ -349,7 +359,7 @@ export default function SettingsScreen() {
           </Section>
 
           {/* Volume slider */}
-          <SectionHead title="HACİM" />
+          <SectionHead title={i18n.t('settings.volume').toUpperCase()} />
           <Section>
             <View style={styles.sliderSection}>
               <View style={styles.sliderHeader}>
@@ -376,12 +386,12 @@ export default function SettingsScreen() {
           </Section>
 
           {/* Noise reduction */}
-          <SectionHead title="GÜRÜLTÜ AZALTMA" />
+          <SectionHead title={i18n.t('settings.noiseReduction').toUpperCase()} />
           <Section>
             <ToggleRow
               icon="noise-cancellation"
-              label="Gürültü Azaltma"
-              desc="Gürültüyü azaltın ancak bu durum ses kalitesini etkileyebilir."
+              label={i18n.t('settings.noiseReduction')}
+              desc={i18n.t('settings.noiseReductionDesc')}
               value={settings.noiseReduction}
               onValueChange={(v) => update({noiseReduction: v})}
               last
@@ -396,26 +406,26 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <Text style={styles.pageTitle}>Ayarlar</Text>
+        <Text style={styles.pageTitle}>{i18n.t('settings.title')}</Text>
 
         {/* ── Video ────────────────────────────────────────────────────── */}
-        <SectionHead title="VİDEO" />
+        <SectionHead title={i18n.t('settings.video').toUpperCase()} />
         <Section>
           <Row
             icon="quality-high"
-            label="Çözünürlük"
+            label={i18n.t('settings.resolution')}
             value={settings.resolution.toUpperCase()}
             onPress={() => setShowResModal(true)}
           />
           <Row
             icon="filmstrip"
-            label="Kare Hızı"
+            label={i18n.t('settings.fps')}
             value={`${settings.fps} FPS`}
             onPress={() => setShowFpsModal(true)}
           />
           <Row
             icon="volume-high"
-            label="Ses Ayarları"
+            label={i18n.t('settings.audio')}
             value={audioSourceLabel[settings.audioSource]}
             onPress={() => setSection('audio')}
             last
@@ -423,27 +433,27 @@ export default function SettingsScreen() {
         </Section>
 
         {/* ── Kontrol ──────────────────────────────────────────────────── */}
-        <SectionHead title="KONTROL" />
+        <SectionHead title={i18n.t('settings.control').toUpperCase()} />
         <Section>
           <Row
             icon="timer-outline"
-            label="Geri Sayım"
+            label={i18n.t('settings.countdown')}
             value={
               settings.countdown === 'off'
-                ? 'Kapalı'
+                ? i18n.t('settings.countdownOff')
                 : settings.countdown.replace('s', ' sn')
             }
             onPress={() => setShowCountdownModal(true)}
           />
           <ToggleRow
             icon="eye-off-outline"
-            label="Kayıt Sonrası Açılır Penceresini Gizle"
+            label={i18n.t('settings.hidePopup')}
             value={settings.hidePostRecordingPopup}
             onValueChange={(v) => update({hidePostRecordingPopup: v})}
           />
           <ToggleRow
             icon="gesture-tap"
-            label="Dokunmayı Göster"
+            label={i18n.t('settings.showTouches')}
             value={settings.showTouches}
             onValueChange={(v) => update({showTouches: v})}
           />
@@ -453,8 +463,8 @@ export default function SettingsScreen() {
               <Icon name="vibrate" size={19} color={Colors.textSecondary} />
             </View>
             <View style={{flex: 1}}>
-              <Text style={styles.rowLabel}>Kaydı Durdurmak İçin Salla</Text>
-              <Text style={styles.rowDesc}>Varsayılan devre dışı bırakıldı</Text>
+              <Text style={styles.rowLabel}>{i18n.t('settings.shakeToStop')}</Text>
+              <Text style={styles.rowDesc}>{i18n.t('settings.disabledByDefault')}</Text>
             </View>
             <Switch
               value={settings.shakeToStop}
@@ -468,7 +478,7 @@ export default function SettingsScreen() {
           {settings.shakeToStop && (
             <View style={styles.sliderSection}>
               <View style={styles.sliderHeader}>
-                <Text style={styles.rowLabelSmall}>Hassasiyet</Text>
+                <Text style={styles.rowLabelSmall}>{i18n.t('settings.shakeSensitivity')}</Text>
                 <Text style={styles.sliderValue}>{settings.shakeSensitivity}%</Text>
               </View>
               <Slider
@@ -488,21 +498,25 @@ export default function SettingsScreen() {
         </Section>
 
         {/* ── Diğerleri ────────────────────────────────────────────────── */}
-        <SectionHead title="DİĞERLERİ" />
+        <SectionHead title={i18n.t('settings.others').toUpperCase()} />
         <Section>
-          <Row
-            icon="folder-outline"
-            label="Kaydetme Konumu"
-            value={`/storage/${settings.saveFolder}`}
-            last={false}
-          />
+          <View style={styles.row}>
+            <View style={styles.rowIconWrap}>
+              <Icon name="folder-outline" size={19} color={Colors.textSecondary} />
+            </View>
+            <View style={{flex: 1}}>
+              <Text style={styles.rowLabel}>{i18n.t('settings.saveLocation')}</Text>
+              <Text style={styles.rowDesc} numberOfLines={1}>/storage/{settings.saveFolder}</Text>
+            </View>
+          </View>
+          <View style={styles.divider} />
           <View style={styles.row}>
             <View style={styles.rowIconWrap}>
               <Icon name="trash-can-outline" size={19} color={Colors.textSecondary} />
             </View>
             <View style={{flex: 1}}>
-              <Text style={styles.rowLabel}>Çöp Kutusu</Text>
-              <Text style={styles.rowDesc}>Sildiğiniz dosyalar 24 saate kadar saklanacaktır</Text>
+              <Text style={styles.rowLabel}>{i18n.t('settings.trash')}</Text>
+              <Text style={styles.rowDesc}>{i18n.t('settings.trashDesc')}</Text>
             </View>
             <Switch
               value={settings.trashEnabled}
@@ -515,20 +529,20 @@ export default function SettingsScreen() {
           <View style={styles.divider} />
           <Row
             icon="translate"
-            label="Dil"
+            label={i18n.t('settings.language')}
             value={
               settings.language === 'system'
-                ? 'Sistem Varsayılanı'
+                ? i18n.t('settings.langSystem')
                 : settings.language === 'tr'
-                ? 'Türkçe'
-                : 'English'
+                ? i18n.t('settings.langTurkish')
+                : i18n.t('settings.langEnglish')
             }
             onPress={() => setShowLangModal(true)}
           />
           <View style={styles.divider} />
           <Row
             icon="information-outline"
-            label="Versiyon"
+            label={i18n.t('settings.version')}
             value="v2.5.0"
             last
           />
@@ -541,14 +555,14 @@ export default function SettingsScreen() {
             style={styles.sigLogo}
           />
           <Text style={styles.sigText}>Velaud Recorder</Text>
-          <Text style={styles.sigSub}>Profesyonel ekran kaydedici</Text>
+          <Text style={styles.sigSub}>{i18n.t('home.brand')}</Text>
         </View>
       </ScrollView>
 
       {/* Modals */}
       <PickerModal
         visible={showResModal}
-        title="Çözünürlük Seç"
+        title={i18n.t('settings.resolution')}
         options={availableResolutions}
         selected={settings.resolution}
         onSelect={(v: ResolutionOption) => update({resolution: v})}
@@ -556,7 +570,7 @@ export default function SettingsScreen() {
       />
       <PickerModal
         visible={showFpsModal}
-        title="Kare Hızı Seç"
+        title={i18n.t('settings.fps')}
         options={availableFps}
         selected={settings.fps}
         onSelect={(v: FpsOption) => update({fps: v})}
@@ -564,7 +578,7 @@ export default function SettingsScreen() {
       />
       <PickerModal
         visible={showCountdownModal}
-        title="Geri Sayım"
+        title={i18n.t('settings.countdown')}
         options={countdownOptions}
         selected={settings.countdown}
         onSelect={(v: CountdownOption) => update({countdown: v})}
@@ -572,7 +586,7 @@ export default function SettingsScreen() {
       />
       <PickerModal
         visible={showLangModal}
-        title="Dil Seç"
+        title={i18n.t('settings.language')}
         options={langOptions}
         selected={settings.language}
         onSelect={(v: LanguageOption) => update({language: v})}

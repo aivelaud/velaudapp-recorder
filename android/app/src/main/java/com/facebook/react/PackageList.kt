@@ -9,6 +9,7 @@ import com.oblador.vectoricons.VectorIconsPackage
 import com.brentvatne.react.ReactVideoPackage
 import com.reactnativecommunity.asyncstorage.AsyncStoragePackage
 import cl.json.RNSharePackage
+import com.reactnativecommunity.slider.ReactSliderPackage
 
 /**
  * Hand-written package list — permanent replacement for broken autolinking.
@@ -45,6 +46,7 @@ class PackageList(private val application: Application) {
         VectorIconsPackage(),              // react-native-vector-icons
         ReactVideoPackage(),               // react-native-video
         AsyncStoragePackage(),             // @react-native-async-storage/async-storage
+        ReactSliderPackage(),              // @react-native-community/slider
         RNSharePackage(),                  // react-native-share
 
         // react-native-google-mobile-ads: EXCLUDED (new arch only, see note above)

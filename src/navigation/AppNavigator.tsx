@@ -5,6 +5,7 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Colors} from '../theme/colors';
+import i18n from '../modules/i18n';
 import HomeScreen from '../screens/HomeScreen';
 import VideosScreen from '../screens/VideosScreen';
 import SettingsScreen from '../screens/SettingsScreen';
@@ -79,7 +80,7 @@ function MainTabs() {
         name="Kayit"
         component={HomeScreen}
         options={{
-          tabBarLabel: 'Kayıt',
+          tabBarLabel: i18n.lang === 'tr' ? 'Kayıt' : 'Record',
           tabBarIcon: ({focused}) => (
             <TabIcon name={focused ? 'record-circle' : 'record-circle-outline'} focused={focused} />
           ),
@@ -89,7 +90,7 @@ function MainTabs() {
         name="Videolar"
         component={VideosScreen}
         options={{
-          tabBarLabel: 'Videolar',
+          tabBarLabel: i18n.lang === 'tr' ? 'Videolar' : 'Videos',
           tabBarIcon: ({focused}) => (
             <TabIcon name={focused ? 'play-box' : 'play-box-outline'} focused={focused} />
           ),
@@ -99,7 +100,7 @@ function MainTabs() {
         name="Ayarlar"
         component={SettingsScreen}
         options={{
-          tabBarLabel: 'Ayarlar',
+          tabBarLabel: i18n.lang === 'tr' ? 'Ayarlar' : 'Settings',
           tabBarIcon: ({focused}) => (
             <TabIcon name={focused ? 'cog' : 'cog-outline'} focused={focused} />
           ),
